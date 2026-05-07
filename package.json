@@ -5,9 +5,19 @@
   "description": "Monorepo: React and Vue component libraries (Tailwind CSS)",
   "license": "ISC",
   "workspaces": ["packages/*", "apps/*"],
+  "devDependencies": {
+    "@storybook/addon-essentials": "^8.6.0",
+    "@storybook/react-vite": "^8.6.0",
+    "storybook": "^8.6.0"
+  },
+  "overrides": {
+    "vite": "^8.0.10"
+  },
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "build:react": "npm run build -w @component-ai/react-ui",
-    "build:vue": "npm run build -w @component-ai/vue-ui"
+    "build:vue": "npm run build -w @component-ai/vue-ui",
+    "storybook:react": "npm run storybook -w @component-ai/storybook-react",
+    "build-storybook:react": "npm run build-storybook -w @component-ai/storybook-react"
   }
 }
