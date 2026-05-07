@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Monorepo: React and Vue component libraries (Tailwind CSS)",
   "license": "ISC",
-  "workspaces": ["packages/*"],
+  "workspaces": ["packages/*", "apps/*"],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "build:react": "npm run build -w @component-ai/react-ui",
