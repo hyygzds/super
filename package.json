@@ -8,6 +8,7 @@
   "devDependencies": {
     "@storybook/addon-essentials": "^8.6.0",
     "@storybook/react-vite": "^8.6.0",
+    "@storybook/vue3-vite": "^8.6.0",
     "storybook": "^8.6.0"
   },
   "overrides": {
@@ -18,6 +19,8 @@
     "build:react": "npm run build -w @component-ai/react-ui",
     "build:vue": "npm run build -w @component-ai/vue-ui",
     "storybook:react": "npm run storybook -w @component-ai/storybook-react",
-    "build-storybook:react": "npm run build-storybook -w @component-ai/storybook-react"
+    "storybook:vue": "npm run storybook -w @component-ai/storybook-vue",
+    "build-storybook:react": "npm run build-storybook -w @component-ai/storybook-react",
+    "build-storybook:vue": "npm run build-storybook -w @component-ai/storybook-vue"
   }
 }
