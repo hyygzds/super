@@ -11,6 +11,12 @@ import {
   type ReactNode,
 } from "react";
 
+function isNodeDevelopment(): boolean {
+  const proc = (globalThis as unknown as { process?: { env?: { NODE_ENV?: string } } })
+    .process;
+  return proc?.env?.NODE_ENV === "development";
+}
+
 type Orientation = "horizontal" | "vertical";
 
 type TabsContextValue = {
@@ -62,7 +68,7 @@ export function Tabs({
   const registerTab = useCallback((value: string, disabled: boolean) => {
     setTabOrder((prev) => {
       if (prev.includes(value)) {
-        if (import.meta.env.DEV) {
+        if (isNodeDevelopment()) {
           console.warn(`[Tabs] duplicate TabsTrigger value: ${value}`);
         }
         return prev;
