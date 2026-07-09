@@ -21,6 +21,8 @@
     "storybook:react": "npm run storybook -w @component-ai/storybook-react",
     "storybook:vue": "npm run storybook -w @component-ai/storybook-vue",
     "build-storybook:react": "npm run build-storybook -w @component-ai/storybook-react",
-    "build-storybook:vue": "npm run build-storybook -w @component-ai/storybook-vue"
+    "build-storybook:vue": "npm run build-storybook -w @component-ai/storybook-vue",
+    "build:grid-core": "pnpm --filter @component-ai/grid-core build",
+    "test:grid-core": "pnpm --filter @component-ai/grid-core test"
   }
 }
