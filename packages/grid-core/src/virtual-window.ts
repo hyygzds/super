@@ -32,6 +32,7 @@ export function computeVirtualWindow(
   const visible = Math.ceil(viewportHeight / safeHeight);
   let startIndex = Math.max(0, rawStart - overscan);
   const endIndex = Math.min(rowCount, rawStart + visible + overscan);
+  // When scrollTop exceeds the list, realign startIndex so it stays below endIndex.
   if (startIndex >= endIndex) {
     startIndex = Math.max(0, endIndex - visible - overscan);
   }

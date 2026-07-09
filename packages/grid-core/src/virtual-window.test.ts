@@ -58,8 +58,13 @@ describe("computeVirtualWindow", () => {
       viewportHeight: 300,
       overscan: 2,
     });
-    expect(bottom.endIndex).toBe(20);
-    expect(bottom.startIndex).toBeLessThan(bottom.endIndex);
+    expect(bottom).toEqual({
+      startIndex: 8,
+      endIndex: 20,
+      offsetY: 240,
+      totalHeight: 600,
+      visibleCount: 12,
+    });
   });
 
   it("handles empty data", () => {
