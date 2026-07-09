@@ -16,3 +16,5 @@ export type {
   TabsTriggerProps,
   TabsPanelProps,
 } from "./components/Tabs";
+export { Pagination } from "./components/Pagination";
+export type { PaginationProps } from "./components/Pagination";
