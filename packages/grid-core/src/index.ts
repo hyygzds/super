@@ -7,3 +7,4 @@ export type {
 } from "./types";
 export { SelectionMode } from "./types";
 export { computeVirtualWindow } from "./virtual-window";
+export { normalizePageSlice, slicePage } from "./paginate";
