@@ -3,3 +3,4 @@ dist
 **/storybook-static
 *.local
 .DS_Store
+.worktrees
