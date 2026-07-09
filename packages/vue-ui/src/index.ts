@@ -9,3 +9,4 @@ export {
   TabsTrigger,
   TabsPanel,
 } from "./components/Tabs";
+export { Pagination } from "./components/Pagination";
