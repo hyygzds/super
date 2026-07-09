@@ -27,7 +27,7 @@ export default defineConfig({
       fileName: "index",
     },
     rollupOptions: {
-      external: ["react", "react-dom", "react/jsx-runtime"],
+      external: ["react", "react-dom", "react/jsx-runtime", "@component-ai/grid-core"],
       output: {
         assetFileNames: "style.css",
       },

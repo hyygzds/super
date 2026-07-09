@@ -105,6 +105,10 @@ importers:
         version: 4.1.10(jsdom@29.1.1)(vite@8.1.4(jiti@2.7.0))
 
   packages/react-ui:
+    dependencies:
+      '@component-ai/grid-core':
+        specifier: workspace:*
+        version: link:../grid-core
     devDependencies:
       '@tailwindcss/vite':
         specifier: ^4.1.17
@@ -153,6 +157,10 @@ importers:
         version: 4.1.10(jsdom@29.1.1)(vite@8.1.4(jiti@2.7.0))
 
   packages/vue-ui:
+    dependencies:
+      '@component-ai/grid-core':
+        specifier: workspace:*
+        version: link:../grid-core
     devDependencies:
       '@tailwindcss/vite':
         specifier: ^4.1.17
