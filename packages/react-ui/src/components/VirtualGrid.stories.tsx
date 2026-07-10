@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { useState } from "react";
 import { VirtualGrid, type VirtualGridColumn } from "./VirtualGrid";
 
 type Row = { id: string; code: string; name: string };
@@ -20,6 +21,24 @@ const virtualData: Row[] = Array.from({ length: 1000 }, (_, i) => ({
   id: String(i + 1),
   code: String(i + 1).padStart(4, "0"),
   name: `Item ${i + 1}`,
+}));
+
+const selectionData: Row[] = Array.from({ length: 8 }, (_, i) => ({
+  id: String(i + 1),
+  code: String(i + 1).padStart(4, "0"),
+  name: `User ${i + 1}`,
+}));
+
+const paginationLocalData: Row[] = Array.from({ length: 30 }, (_, i) => ({
+  id: String(i + 1),
+  code: String(i + 1).padStart(4, "0"),
+  name: `Item ${i + 1}`,
+}));
+
+const paginationRemoteAllData: Row[] = Array.from({ length: 47 }, (_, i) => ({
+  id: String(i + 1),
+  code: String(i + 1).padStart(4, "0"),
+  name: `Remote ${i + 1}`,
 }));
 
 const meta = {
@@ -121,4 +140,82 @@ export const HeaderTemplate: Story = {
       className="h-80"
     />
   ),
+};
+
+export const Selection: Story = {
+  render: function Render() {
+    const [selectedKeys, setSelectedKeys] = useState<string[]>(["1", "3"]);
+    return (
+      <VirtualGrid
+        data={selectionData}
+        columns={columns}
+        showRowNumber={false}
+        selectionMode="multiple"
+        selectedKeys={selectedKeys}
+        onSelectedKeysChange={setSelectedKeys}
+        className="h-80"
+      />
+    );
+  },
+};
+
+export const SelectionSingle: Story = {
+  render: function Render() {
+    const [selectedKeys, setSelectedKeys] = useState<string[]>(["2"]);
+    return (
+      <VirtualGrid
+        data={selectionData}
+        columns={columns}
+        showRowNumber={false}
+        selectionMode="single"
+        selectedKeys={selectedKeys}
+        onSelectedKeysChange={setSelectedKeys}
+        className="h-80"
+      />
+    );
+  },
+};
+
+export const PaginationLocal: Story = {
+  render: () => (
+    <VirtualGrid
+      data={paginationLocalData}
+      columns={columns}
+      showRowNumber={false}
+      pagination
+      paginationMode="local"
+      defaultPageSize={10}
+      className="h-80"
+    />
+  ),
+};
+
+export const PaginationRemote: Story = {
+  render: function Render() {
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+    const total = paginationRemoteAllData.length;
+    const data = paginationRemoteAllData.slice(
+      (page - 1) * pageSize,
+      page * pageSize,
+    );
+    return (
+      <VirtualGrid
+        data={data}
+        columns={columns}
+        showRowNumber={false}
+        pagination
+        paginationMode="remote"
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={setPage}
+        onPageSizeChange={(nextPageSize) => {
+          setPageSize(nextPageSize);
+          setPage(1);
+        }}
+        className="h-80"
+      />
+    );
+  },
 };
