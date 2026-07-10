@@ -3,6 +3,7 @@ export type GridColumn = {
   title: string;
   width?: number;
   hidden?: boolean;
+  fixed?: "left" | "right";
   children?: GridColumn[];
 };
 

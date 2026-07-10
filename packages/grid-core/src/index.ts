@@ -15,3 +15,9 @@ export {
   isAllSelected,
   isIndeterminate,
 } from "./selection";
+export { computeStickyLayout } from "./sticky-layout";
+export type {
+  StickyLayoutInput,
+  StickyFieldInfo,
+  StickyLayout,
+} from "./sticky-layout";
