@@ -1,5 +1,6 @@
 import {
   clearKeys,
+  computeStickyLayout,
   computeVirtualWindow,
   isAllSelected,
   isIndeterminate,
@@ -7,6 +8,7 @@ import {
   slicePage,
   toggleKey,
   type GridColumn,
+  type StickyFieldInfo,
 } from "@component-ai/grid-core";
 import { Checkbox } from "./Checkbox";
 import { Pagination } from "./Pagination";
@@ -16,6 +18,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type MouseEvent,
   type ReactNode,
 } from "react";
@@ -99,6 +102,23 @@ function rowKey<T extends Record<string, unknown>>(
   return String(raw);
 }
 
+function stickyCellStyle(
+  info: StickyFieldInfo | undefined,
+  zIndex: number,
+): CSSProperties | undefined {
+  if (!info || info.sticky === false) return undefined;
+  return info.sticky === "left"
+    ? { position: "sticky", left: info.offset, zIndex }
+    : { position: "sticky", right: info.offset, zIndex };
+}
+
+function stickyEdgeClass(info: StickyFieldInfo | undefined): string {
+  if (!info || info.sticky === false || !info.isEdge) return "";
+  return info.sticky === "left"
+    ? "shadow-[2px_0_4px_-2px_rgba(15,23,42,0.12)]"
+    : "shadow-[-2px_0_4px_-2px_rgba(15,23,42,0.12)]";
+}
+
 export function VirtualGrid<
   T extends Record<string, unknown> = Record<string, unknown>,
 >({
@@ -145,6 +165,23 @@ export function VirtualGrid<
 
   const showSelection = selectionMode !== "none";
   const multiple = selectionMode === "multiple";
+  const sticky = useMemo(
+    () =>
+      computeStickyLayout({
+        columns: visibleColumns,
+        showSelection,
+        showRowNumber,
+      }),
+    [visibleColumns, showSelection, showRowNumber],
+  );
+
+  const orderedColumns = useMemo(
+    () =>
+      sticky.dataFields
+        .map((field) => visibleColumns.find((c) => c.field === field)!)
+        .filter(Boolean),
+    [sticky.dataFields, visibleColumns],
+  );
 
   const paginationTotal =
     pagination && paginationMode === "remote"
@@ -283,9 +320,19 @@ export function VirtualGrid<
           >
             {showSelection ? (
               <div
-                className="flex w-12 shrink-0 items-center justify-center border-r border-slate-200"
+                data-sticky={sticky.selection ? "left" : undefined}
+                className="flex w-12 shrink-0 items-center justify-center border-r border-slate-200 bg-slate-50"
                 role="columnheader"
-                style={{ height: rowHeight }}
+                style={{
+                  height: rowHeight,
+                  ...(sticky.selection
+                    ? {
+                        position: "sticky",
+                        left: sticky.selection.left,
+                        zIndex: 30,
+                      }
+                    : null),
+                }}
               >
                 {multiple ? (
                   <Checkbox
@@ -299,26 +346,43 @@ export function VirtualGrid<
             ) : null}
             {showRowNumber ? (
               <div
-                className="flex w-14 shrink-0 items-center justify-center border-r border-slate-200 px-1 font-medium text-slate-600"
-                style={{ height: rowHeight }}
+                data-sticky={sticky.rowNumber ? "left" : undefined}
+                className="flex w-14 shrink-0 items-center justify-center border-r border-slate-200 bg-slate-50 px-1 font-medium text-slate-600"
+                style={{
+                  height: rowHeight,
+                  ...(sticky.rowNumber
+                    ? {
+                        position: "sticky",
+                        left: sticky.rowNumber.left,
+                        zIndex: 30,
+                      }
+                    : null),
+                }}
                 role="columnheader"
               >
                 #
               </div>
             ) : null}
-            {visibleColumns.map((col) => (
-              <div
-                key={col.field}
-                className="flex shrink-0 items-center border-r border-slate-200 px-3 font-medium text-slate-700 last:border-r-0"
-                style={{
-                  width: col.width ?? 120,
-                  height: rowHeight,
-                }}
-                role="columnheader"
-              >
-                {headerContent(col)}
-              </div>
-            ))}
+            {orderedColumns.map((col) => {
+              const colSticky = sticky.byField[col.field];
+              return (
+                <div
+                  key={col.field}
+                  data-sticky={
+                    colSticky?.sticky === false ? undefined : colSticky?.sticky
+                  }
+                  className={`flex shrink-0 items-center border-r border-slate-200 bg-slate-50 px-3 font-medium text-slate-700 last:border-r-0 ${stickyEdgeClass(colSticky)}`}
+                  style={{
+                    width: col.width ?? 120,
+                    height: rowHeight,
+                    ...stickyCellStyle(colSticky, 30),
+                  }}
+                  role="columnheader"
+                >
+                  {headerContent(col)}
+                </div>
+              );
+            })}
           </div>
         ) : null}
 
@@ -371,8 +435,18 @@ export function VirtualGrid<
                     >
                       {showSelection ? (
                         <div
-                          className="flex w-12 shrink-0 items-center justify-center border-r border-slate-100"
+                          data-sticky={sticky.selection ? "left" : undefined}
+                          className={`flex w-12 shrink-0 items-center justify-center border-r border-slate-100 ${zebra}`}
                           role="gridcell"
+                          style={
+                            sticky.selection
+                              ? {
+                                  position: "sticky",
+                                  left: sticky.selection.left,
+                                  zIndex: 20,
+                                }
+                              : undefined
+                          }
                           onClick={(e) => e.stopPropagation()}
                         >
                           <Checkbox
@@ -384,22 +458,41 @@ export function VirtualGrid<
                       ) : null}
                       {showRowNumber ? (
                         <div
-                          className="flex w-14 shrink-0 items-center justify-center border-r border-slate-100 text-slate-500"
+                          data-sticky={sticky.rowNumber ? "left" : undefined}
+                          className={`flex w-14 shrink-0 items-center justify-center border-r border-slate-100 text-slate-500 ${zebra}`}
                           role="gridcell"
+                          style={
+                            sticky.rowNumber
+                              ? {
+                                  position: "sticky",
+                                  left: sticky.rowNumber.left,
+                                  zIndex: 20,
+                                }
+                              : undefined
+                          }
                         >
                           {displayIndex}
                         </div>
                       ) : null}
-                      {visibleColumns.map((col) => (
-                        <div
-                          key={col.field}
-                          className="flex shrink-0 items-center overflow-hidden border-r border-slate-100 px-3 text-ellipsis whitespace-nowrap last:border-r-0"
-                          style={{ width: col.width ?? 120 }}
-                          role="gridcell"
-                        >
-                          {cellContent(row, col, rowIndex)}
-                        </div>
-                      ))}
+                      {orderedColumns.map((col) => {
+                        const colSticky = sticky.byField[col.field];
+                        return (
+                          <div
+                            key={col.field}
+                            data-sticky={
+                              colSticky?.sticky === false ? undefined : colSticky?.sticky
+                            }
+                            className={`flex shrink-0 items-center overflow-hidden border-r border-slate-100 px-3 text-ellipsis whitespace-nowrap last:border-r-0 ${zebra} ${stickyEdgeClass(colSticky)}`}
+                            style={{
+                              width: col.width ?? 120,
+                              ...stickyCellStyle(colSticky, 20),
+                            }}
+                            role="gridcell"
+                          >
+                            {cellContent(row, col, rowIndex)}
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })}
