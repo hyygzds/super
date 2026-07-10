@@ -22,7 +22,7 @@
 | 2 | [`2026-07-09-pagination.md`](./2026-07-09-pagination.md) | 双端完整 `Pagination` 组件 | 无（可与 1 并行） |
 | 3 | [`2026-07-09-checkbox.md`](./2026-07-09-checkbox.md) | 双端完整 `Checkbox` / `CheckboxGroup` | 建议在 VirtualGrid P1 前 |
 | 4 | *待写* `YYYY-MM-DD-input.md` | 双端完整 `Input` | VirtualGrid P5 前 |
-| 5 | *待写* `YYYY-MM-DD-virtual-grid-p0.md` | VirtualGrid 基础表 + 虚拟滚动（双端） | 依赖 1 |
+| 5 | [`2026-07-10-virtual-grid-p0.md`](./2026-07-10-virtual-grid-p0.md) | VirtualGrid 基础表 + 虚拟滚动（双端） | 依赖 1 |
 | 6 | *待写* `YYYY-MM-DD-virtual-grid-p1.md` | 选中 + 分页接线 | 依赖 1、2、3、5 |
 | 7 | *待写* `YYYY-MM-DD-virtual-grid-p2.md` | 模板、自动行高、固定列 | 依赖 5 |
 | 8 | *待写* `YYYY-MM-DD-virtual-grid-p3.md` | 表头/数据分组、合并单元格 | 依赖 5；扩展 grid-core |
@@ -45,7 +45,8 @@
 1. ~~完成 [`2026-07-09-grid-core.md`](./2026-07-09-grid-core.md)~~
 2. ~~完成 [`2026-07-09-pagination.md`](./2026-07-09-pagination.md)~~
 3. ~~完成 [`2026-07-09-checkbox.md`](./2026-07-09-checkbox.md)~~
-4. 下一优先：VirtualGrid P0 详细计划（brainstorming / writing-plans），或 Input（P5 前）
+4. 执行 [`2026-07-10-virtual-grid-p0.md`](./2026-07-10-virtual-grid-p0.md)
+5. 其后：VirtualGrid P1（选中 + 分页）或 Input（P5 前）
 
 ---
 
