@@ -193,6 +193,13 @@ export function VirtualGrid<
     () => data.map((row, index) => rowKey(row, index, idField)),
     [data, idField],
   );
+  const scopeKeySet = useMemo(() => new Set(scopeKeys), [scopeKeys]);
+  const scopedSelectedKeys = useMemo(
+    () => selectedKeys.filter((k) => scopeKeySet.has(k)),
+    [selectedKeys, scopeKeySet],
+  );
+  const headerChecked = isAllSelected(selectedKeys, scopeKeys);
+  const headerIndeterminate = isIndeterminate(scopedSelectedKeys, scopeKeys);
 
   function setSelectedKeys(next: string[]) {
     if (selectedKeysProp === undefined) setInnerKeys(next);
@@ -207,8 +214,6 @@ export function VirtualGrid<
   function setPageSize(next: number) {
     if (pageSizeProp === undefined) setInnerSize(next);
     onPageSizeChange?.(next);
-    if (pageProp === undefined) setInnerPage(1);
-    onPageChange?.(1);
   }
 
   function onToggleRow(key: string) {
@@ -216,7 +221,7 @@ export function VirtualGrid<
   }
 
   function onToggleAll() {
-    if (isAllSelected(selectedKeys, scopeKeys) || isIndeterminate(selectedKeys, scopeKeys)) {
+    if (headerChecked || headerIndeterminate) {
       setSelectedKeys(clearKeys());
     } else {
       setSelectedKeys(selectAllKeys(scopeKeys));
@@ -265,9 +270,12 @@ export function VirtualGrid<
     <div
       data-testid="virtual-grid"
       className={pagination ? outerCls : gridCls}
-      role="grid"
+      role={pagination ? undefined : "grid"}
     >
-      <div className={pagination ? cardCls : "contents"}>
+      <div
+        className={pagination ? cardCls : "contents"}
+        role={pagination ? "grid" : undefined}
+      >
         {showHeader ? (
           <div
             className="flex shrink-0 border-b border-slate-200 bg-slate-50"
@@ -282,8 +290,8 @@ export function VirtualGrid<
                 {multiple ? (
                   <Checkbox
                     aria-label="全选"
-                    checked={isAllSelected(selectedKeys, scopeKeys)}
-                    indeterminate={isIndeterminate(selectedKeys, scopeKeys)}
+                    checked={headerChecked}
+                    indeterminate={headerIndeterminate}
                     onCheckedChange={() => onToggleAll()}
                   />
                 ) : null}
