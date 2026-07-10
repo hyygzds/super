@@ -44,8 +44,8 @@
 
 1. ~~完成 [`2026-07-09-grid-core.md`](./2026-07-09-grid-core.md)~~
 2. ~~完成 [`2026-07-09-pagination.md`](./2026-07-09-pagination.md)~~
-3. 执行 [`2026-07-09-checkbox.md`](./2026-07-09-checkbox.md)
-4. 其后：VirtualGrid P0 详细计划，或 Input（P5 前）
+3. ~~完成 [`2026-07-09-checkbox.md`](./2026-07-09-checkbox.md)~~
+4. 下一优先：VirtualGrid P0 详细计划（brainstorming / writing-plans），或 Input（P5 前）
 
 ---
 
