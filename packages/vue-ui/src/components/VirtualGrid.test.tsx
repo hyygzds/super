@@ -236,4 +236,40 @@ describe("VirtualGrid (Vue)", () => {
     expect(wrapper.emitted("update:selectedKeys")).toBeTruthy();
     expect(wrapper.emitted("rowClick")).toBeUndefined();
   });
+
+  it("applies sticky left offsets for selection and fixed columns", () => {
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        data,
+        columns: [
+          { field: "code", title: "编号", width: 100, fixed: "left" },
+          { field: "name", title: "名称", width: 200 },
+        ],
+        selectionMode: "multiple",
+        showRowNumber: true,
+      },
+    });
+    const leftStickies = wrapper.findAll('[data-sticky="left"]');
+    expect(leftStickies.length).toBeGreaterThan(0);
+    const selection = leftStickies[0]!;
+    expect(selection.attributes("style") || "").toMatch(/left:\s*0px/);
+    const code = leftStickies.find((n) => n.text().includes("编号"));
+    expect(code?.attributes("style") || "").toMatch(new RegExp(`left:\\s*${48 + 56}px`));
+  });
+
+  it("applies sticky right for fixed right columns", () => {
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        data,
+        columns: [
+          { field: "code", title: "编号", width: 100 },
+          { field: "name", title: "名称", width: 120, fixed: "right" },
+        ],
+        showRowNumber: false,
+        selectionMode: "none",
+      },
+    });
+    const name = wrapper.find('[data-sticky="right"]');
+    expect(name.attributes("style") || "").toMatch(/right:\s*0px/);
+  });
 });
