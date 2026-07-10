@@ -24,7 +24,7 @@
 | 4 | [`2026-07-10-input.md`](./2026-07-10-input.md) | 双端完整 `Input` | VirtualGrid P5 前 |
 | 5 | [`2026-07-10-virtual-grid-p0.md`](./2026-07-10-virtual-grid-p0.md) | VirtualGrid 基础表 + 虚拟滚动骨架 | 计划 1 |
 | 6 | [`2026-07-10-virtual-grid-p1.md`](./2026-07-10-virtual-grid-p1.md) | 选中 + 分页集成 | 计划 1、2、3、5 |
-| 7 | *待写* `YYYY-MM-DD-virtual-grid-p2.md` | 固定列与横向滚动 | 计划 5 |
+| 7 | [`2026-07-10-virtual-grid-p2.md`](./2026-07-10-virtual-grid-p2.md) | 固定列与横向滚动 | 计划 5 |
 | 8 | *待写* `YYYY-MM-DD-virtual-grid-p3.md` | 分组/合并等高级展示 | 计划 5，可能扩展 grid-core |
 | 9 | *待写* `YYYY-MM-DD-virtual-grid-p4.md` | 树形与层级数据 | 计划 5、3，可能扩展 grid-core |
 | 10 | *待写* `YYYY-MM-DD-virtual-grid-p5.md` | 单元格编辑等 | 计划 4、2、5 |
@@ -36,6 +36,7 @@
 ## grid-core 扩展策略
 
 - **Plan 1** 覆盖 P0/P1 所需的虚拟窗口 / 分页 / 选中辅助
+- P2 增加轻量 `computeStickyLayout`（列 `fixed` 偏移）
 - P3/P4 若需新算法，另开 **grid-core 扩展计划**（`group` / `span` / `tree`），纯 TS + Vitest
 
 ---
@@ -48,7 +49,8 @@
 4. ~~完成 [`2026-07-10-virtual-grid-p0.md`](./2026-07-10-virtual-grid-p0.md)~~
 5. ~~完成 [`2026-07-10-input.md`](./2026-07-10-input.md)~~
 6. ~~完成 [`2026-07-10-virtual-grid-p1.md`](./2026-07-10-virtual-grid-p1.md)~~
-7. 下一优先：VirtualGrid P2（固定列与横向滚动）详细计划
+7. 执行 [`2026-07-10-virtual-grid-p2.md`](./2026-07-10-virtual-grid-p2.md)
+8. 其后：VirtualGrid P3（分组/合并）或自动行高详细计划
 
 ---
 
