@@ -20,6 +20,8 @@ export { Pagination } from "./components/Pagination";
 export type { PaginationProps } from "./components/Pagination";
 export { Checkbox, CheckboxGroup } from "./components/Checkbox";
 export type { CheckboxProps, CheckboxGroupProps } from "./components/Checkbox";
+export { Input } from "./components/Input";
+export type { InputProps, InputType, InputSize } from "./components/Input";
 export { VirtualGrid } from "./components/VirtualGrid";
 export type {
   VirtualGridProps,
