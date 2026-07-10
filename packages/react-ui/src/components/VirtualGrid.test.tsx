@@ -318,4 +318,63 @@ describe("VirtualGrid (React)", () => {
     expect(onSelectedKeysChange).toHaveBeenCalled();
     expect(onRowClick).not.toHaveBeenCalled();
   });
+
+  it("applies sticky left to selection, row number, and fixed left columns", () => {
+    render(
+      <VirtualGrid
+        data={data}
+        columns={[
+          { field: "code", title: "编号", width: 100, fixed: "left" },
+          { field: "name", title: "名称", width: 200 },
+        ]}
+        selectionMode="multiple"
+        showRowNumber
+      />,
+    );
+    const selection = screen.getByRole("checkbox", { name: "全选" }).closest(
+      '[data-sticky="left"]',
+    );
+    expect(selection).toHaveStyle({ position: "sticky", left: "0px" });
+
+    const rowNumberHeader = screen.getByText("#").closest('[data-sticky="left"]');
+    expect(rowNumberHeader).toHaveStyle({ position: "sticky", left: "48px" });
+
+    const codeHeader = screen.getByText("编号").closest('[data-sticky="left"]');
+    expect(codeHeader).toHaveStyle({
+      position: "sticky",
+      left: `${48 + 56}px`,
+    });
+  });
+
+  it("applies sticky right to fixed right columns", () => {
+    render(
+      <VirtualGrid
+        data={data}
+        columns={[
+          { field: "code", title: "编号", width: 100 },
+          { field: "name", title: "名称", width: 120, fixed: "right" },
+        ]}
+        showRowNumber={false}
+        selectionMode="none"
+      />,
+    );
+    const nameHeader = screen.getByText("名称").closest('[data-sticky="right"]');
+    expect(nameHeader).toHaveStyle({ position: "sticky", right: "0px" });
+  });
+
+  it("renders data columns in left-mid-right order", () => {
+    render(
+      <VirtualGrid
+        data={[{ id: "1", a: "A", b: "B", c: "C" }]}
+        columns={[
+          { field: "a", title: "A", width: 80, fixed: "left" },
+          { field: "b", title: "B", width: 80 },
+          { field: "c", title: "C", width: 80, fixed: "right" },
+        ]}
+        showRowNumber={false}
+      />,
+    );
+    const headers = screen.getAllByRole("columnheader").map((el) => el.textContent);
+    expect(headers).toEqual(["A", "B", "C"]);
+  });
 });
