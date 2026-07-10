@@ -23,7 +23,7 @@
 | 3 | [6-07-09-checkbox.md](./2026-07-09-checkbox.md) | 双端完整 Checkbox / CheckboxGroup | 建议在 VirtualGrid P1 前 |
 | 4 | [6-07-10-input.md](./2026-07-10-input.md) | 双端完整 Input | VirtualGrid P5 前 |
 | 5 | [6-07-10-virtual-grid-p0.md](./2026-07-10-virtual-grid-p0.md) | VirtualGrid 基础表 + 虚拟滚动骨架 | 计划 1 |
-| 6 | *待写* YYYY-MM-DD-virtual-grid-p1.md | 选中 + 分页集成 | 计划 1、2、3、5 |
+| 6 | [6-07-10-virtual-grid-p1.md](./2026-07-10-virtual-grid-p1.md) | 选中 + 分页集成 | 计划 1、2、3、5 |
 | 7 | *待写* YYYY-MM-DD-virtual-grid-p2.md | 固定列与横向滚动 | 计划 5 |
 | 8 | *待写* YYYY-MM-DD-virtual-grid-p3.md | 分组/合并等高级展示 | 计划 5，可能扩展 grid-core |
 | 9 | *待写* YYYY-MM-DD-virtual-grid-p4.md | 树形与层级数据 | 计划 5、3，可能扩展 grid-core |
@@ -47,7 +47,7 @@
 3. ~~完成 [6-07-09-checkbox.md](./2026-07-09-checkbox.md)~~
 4. ~~完成 [6-07-10-virtual-grid-p0.md](./2026-07-10-virtual-grid-p0.md)~~
 5. ~~完成 [6-07-10-input.md](./2026-07-10-input.md)~~
-6. 下一优先：VirtualGrid P1（选中 + 分页）详细计划
+6. 执行 [6-07-10-virtual-grid-p1.md](./2026-07-10-virtual-grid-p1.md)\n7. 其后：VirtualGrid P2（固定列）详细计划
 
 ---
 
