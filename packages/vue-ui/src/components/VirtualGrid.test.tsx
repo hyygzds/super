@@ -122,4 +122,118 @@ describe("VirtualGrid (Vue)", () => {
     wrapper.unmount();
     parent.remove();
   });
+
+  it("emits update:selectedKeys on row checkbox", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        data,
+        columns,
+        showRowNumber: false,
+        selectionMode: "multiple",
+        defaultSelectedKeys: [],
+      },
+    });
+    const box = wrapper.find('input[aria-label="选择行 1"]');
+    await box.setValue(true);
+    expect(wrapper.emitted("update:selectedKeys")?.at(-1)).toEqual([["1"]]);
+  });
+
+  it("select-all uses full data in local pagination", async () => {
+    const many = [
+      { id: "1", code: "a", name: "A" },
+      { id: "2", code: "b", name: "B" },
+      { id: "3", code: "c", name: "C" },
+    ];
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        data: many,
+        columns,
+        showRowNumber: false,
+        selectionMode: "multiple",
+        pagination: true,
+        paginationMode: "local",
+        defaultPageSize: 2,
+        defaultSelectedKeys: [],
+      },
+    });
+    expect(wrapper.text()).toContain("A");
+    expect(wrapper.text()).not.toContain("C");
+    await wrapper.find('input[aria-label="全选"]').setValue(true);
+    expect(wrapper.emitted("update:selectedKeys")?.at(-1)).toEqual([
+      ["1", "2", "3"],
+    ]);
+  });
+
+  it("slices in local pagination", () => {
+    const many = Array.from({ length: 5 }, (_, i) => ({
+      id: String(i + 1),
+      code: `c${i + 1}`,
+      name: `n${i + 1}`,
+    }));
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        data: many,
+        columns,
+        showRowNumber: false,
+        pagination: true,
+        paginationMode: "local",
+        defaultPage: 1,
+        defaultPageSize: 2,
+      },
+    });
+    expect(wrapper.text()).toContain("n1");
+    expect(wrapper.text()).not.toContain("n3");
+    expect(wrapper.find('[data-testid="virtual-grid-pagination"]').exists()).toBe(
+      true,
+    );
+  });
+
+  it("remote page change emits update:page without slicing away rows", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        data,
+        columns,
+        showRowNumber: false,
+        pagination: true,
+        paginationMode: "remote",
+        total: 50,
+        page: 1,
+        pageSize: 10,
+      },
+    });
+    expect(wrapper.text()).toContain("Sagi");
+    expect(wrapper.text()).toContain("Nancy");
+    await wrapper
+      .find('[data-testid="virtual-grid-pagination"] button[aria-label="下一页"]')
+      .trigger("click");
+    expect(wrapper.emitted("update:page")?.at(-1)).toEqual([2]);
+  });
+
+  it("single mode has no select-all checkbox", () => {
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        data,
+        columns,
+        showRowNumber: false,
+        selectionMode: "single",
+        defaultSelectedKeys: ["1"],
+      },
+    });
+    expect(wrapper.find('input[aria-label="全选"]').exists()).toBe(false);
+    expect(wrapper.find('input[aria-label="选择行 1"]').exists()).toBe(true);
+  });
+
+  it("does not emit rowClick when clicking row checkbox", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        data,
+        columns,
+        showRowNumber: false,
+        selectionMode: "multiple",
+      },
+    });
+    await wrapper.find('input[aria-label="选择行 1"]').setValue(true);
+    expect(wrapper.emitted("update:selectedKeys")).toBeTruthy();
+    expect(wrapper.emitted("rowClick")).toBeUndefined();
+  });
 });

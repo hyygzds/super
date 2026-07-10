@@ -60,6 +60,7 @@ function MinusIcon() {
 
 export const Checkbox = defineComponent({
   name: "Checkbox",
+  inheritAttrs: false,
   props: {
     checked: { type: Boolean, default: undefined },
     defaultChecked: { type: Boolean, default: false },
@@ -70,7 +71,7 @@ export const Checkbox = defineComponent({
     label: { type: String, default: undefined },
   },
   emits: ["update:checked"],
-  setup(props, { emit, slots }) {
+  setup(props, { emit, slots, attrs }) {
     const group = inject(CHECKBOX_GROUP_KEY, null);
     const inputRef = ref<HTMLInputElement | null>(null);
     const inner = ref(props.defaultChecked);
@@ -135,6 +136,7 @@ export const Checkbox = defineComponent({
               checked={checked.value}
               disabled={isDisabled.value}
               value={props.value}
+              aria-label={attrs["aria-label"] as string | undefined}
               aria-checked={
                 showIndeterminate.value ? "mixed" : checked.value
               }

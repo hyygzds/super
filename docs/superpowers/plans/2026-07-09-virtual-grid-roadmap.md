@@ -47,8 +47,8 @@
 3. ~~完成 [`2026-07-09-checkbox.md`](./2026-07-09-checkbox.md)~~
 4. ~~完成 [`2026-07-10-virtual-grid-p0.md`](./2026-07-10-virtual-grid-p0.md)~~
 5. ~~完成 [`2026-07-10-input.md`](./2026-07-10-input.md)~~
-6. 执行 [`2026-07-10-virtual-grid-p1.md`](./2026-07-10-virtual-grid-p1.md)
-7. 其后：VirtualGrid P2（固定列）详细计划
+6. ~~完成 [`2026-07-10-virtual-grid-p1.md`](./2026-07-10-virtual-grid-p1.md)~~
+7. 下一优先：VirtualGrid P2（固定列与横向滚动）详细计划
 
 ---
 
