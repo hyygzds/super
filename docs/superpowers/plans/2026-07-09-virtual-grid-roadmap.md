@@ -20,7 +20,7 @@
 |------|----------|--------|----------|
 | 1 | [`2026-07-09-grid-core.md`](./2026-07-09-grid-core.md) | `@component-ai/grid-core`：类型 + 虚拟窗口 + 分页切片 + 选中状态机（P0/P1 所需） | 无 |
 | 2 | [`2026-07-09-pagination.md`](./2026-07-09-pagination.md) | 双端完整 `Pagination` 组件 | 无（可与 1 并行） |
-| 3 | *待写* `YYYY-MM-DD-checkbox.md` | 双端完整 `Checkbox` | 建议在 VirtualGrid P1 前 |
+| 3 | [`2026-07-09-checkbox.md`](./2026-07-09-checkbox.md) | 双端完整 `Checkbox` / `CheckboxGroup` | 建议在 VirtualGrid P1 前 |
 | 4 | *待写* `YYYY-MM-DD-input.md` | 双端完整 `Input` | VirtualGrid P5 前 |
 | 5 | *待写* `YYYY-MM-DD-virtual-grid-p0.md` | VirtualGrid 基础表 + 虚拟滚动（双端） | 依赖 1 |
 | 6 | *待写* `YYYY-MM-DD-virtual-grid-p1.md` | 选中 + 分页接线 | 依赖 1、2、3、5 |
@@ -42,9 +42,10 @@
 
 ## 当前应执行
 
-1. 完成 [`2026-07-09-grid-core.md`](./2026-07-09-grid-core.md)
-2. 完成 [`2026-07-09-pagination.md`](./2026-07-09-pagination.md)（可与 1 并行）
-3. 再回头用 brainstorming / writing-plans 为 Checkbox（或 VirtualGrid P0）写下一份详细计划
+1. ~~完成 [`2026-07-09-grid-core.md`](./2026-07-09-grid-core.md)~~
+2. ~~完成 [`2026-07-09-pagination.md`](./2026-07-09-pagination.md)~~
+3. 执行 [`2026-07-09-checkbox.md`](./2026-07-09-checkbox.md)
+4. 其后：VirtualGrid P0 详细计划，或 Input（P5 前）
 
 ---
 
