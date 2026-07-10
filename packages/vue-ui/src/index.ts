@@ -10,3 +10,4 @@ export {
   TabsPanel,
 } from "./components/Tabs";
 export { Pagination } from "./components/Pagination";
+export { Checkbox, CheckboxGroup } from "./components/Checkbox";
