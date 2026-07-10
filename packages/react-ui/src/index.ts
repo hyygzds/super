@@ -18,3 +18,5 @@ export type {
 } from "./components/Tabs";
 export { Pagination } from "./components/Pagination";
 export type { PaginationProps } from "./components/Pagination";
+export { Checkbox, CheckboxGroup } from "./components/Checkbox";
+export type { CheckboxProps, CheckboxGroupProps } from "./components/Checkbox";
