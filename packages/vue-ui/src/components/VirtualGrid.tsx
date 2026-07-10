@@ -1,5 +1,6 @@
 import {
   clearKeys,
+  computeStickyLayout,
   computeVirtualWindow,
   isAllSelected,
   isIndeterminate,
@@ -7,9 +8,11 @@ import {
   slicePage,
   toggleKey,
   type GridColumn,
+  type StickyFieldInfo,
 } from "@component-ai/grid-core";
 import {
   computed,
+  type CSSProperties,
   defineComponent,
   onMounted,
   onUnmounted,
@@ -63,6 +66,23 @@ function rowKey<T extends Record<string, unknown>>(
     return `row-${index}`;
   }
   return String(raw);
+}
+
+function stickyCellStyle(
+  info: StickyFieldInfo | undefined,
+  zIndex: number,
+): CSSProperties | undefined {
+  if (!info || info.sticky === false) return undefined;
+  return info.sticky === "left"
+    ? { position: "sticky", left: `${info.offset}px`, zIndex }
+    : { position: "sticky", right: `${info.offset}px`, zIndex };
+}
+
+function stickyEdgeClass(info: StickyFieldInfo | undefined): string {
+  if (!info || info.sticky === false || !info.isEdge) return "";
+  return info.sticky === "left"
+    ? "shadow-[2px_0_4px_-2px_rgba(15,23,42,0.12)]"
+    : "shadow-[-2px_0_4px_-2px_rgba(15,23,42,0.12)]";
 }
 
 export const VirtualGrid = defineComponent({
@@ -138,6 +158,18 @@ export const VirtualGrid = defineComponent({
     );
     const showSelection = computed(() => props.selectionMode !== "none");
     const multiple = computed(() => props.selectionMode === "multiple");
+    const sticky = computed(() =>
+      computeStickyLayout({
+        columns: visibleColumns.value,
+        showSelection: showSelection.value,
+        showRowNumber: props.showRowNumber,
+      }),
+    );
+    const orderedColumns = computed(() =>
+      sticky.value.dataFields
+        .map((field) => visibleColumns.value.find((c) => c.field === field)!)
+        .filter(Boolean),
+    );
 
     const paginationTotal = computed(() =>
       props.pagination && props.paginationMode === "remote"
@@ -301,9 +333,19 @@ export const VirtualGrid = defineComponent({
               >
                 {showSelection.value ? (
                   <div
-                    class="flex w-12 shrink-0 items-center justify-center border-r border-slate-200"
+                    data-sticky={sticky.value.selection ? "left" : undefined}
+                    class="flex w-12 shrink-0 items-center justify-center border-r border-slate-200 bg-slate-50"
                     role="columnheader"
-                    style={{ height: props.rowHeight }}
+                    style={{
+                      height: props.rowHeight,
+                      ...(sticky.value.selection
+                        ? {
+                            position: "sticky",
+                            left: `${sticky.value.selection.left}px`,
+                            zIndex: 30,
+                          }
+                        : null),
+                    }}
                   >
                     {multiple.value ? (
                       <Checkbox
@@ -317,26 +359,43 @@ export const VirtualGrid = defineComponent({
                 ) : null}
                 {props.showRowNumber ? (
                   <div
-                    class="flex w-14 shrink-0 items-center justify-center border-r border-slate-200 px-1 font-medium text-slate-600"
-                    style={{ height: props.rowHeight }}
+                    data-sticky={sticky.value.rowNumber ? "left" : undefined}
+                    class="flex w-14 shrink-0 items-center justify-center border-r border-slate-200 bg-slate-50 px-1 font-medium text-slate-600"
+                    style={{
+                      height: props.rowHeight,
+                      ...(sticky.value.rowNumber
+                        ? {
+                            position: "sticky",
+                            left: `${sticky.value.rowNumber.left}px`,
+                            zIndex: 30,
+                          }
+                        : null),
+                    }}
                     role="columnheader"
                   >
                     #
                   </div>
                 ) : null}
-                {visibleColumns.value.map((col) => (
-                  <div
-                    key={col.field}
-                    class="flex shrink-0 items-center border-r border-slate-200 px-3 font-medium text-slate-700 last:border-r-0"
-                    style={{
-                      width: col.width ?? 120,
-                      height: props.rowHeight,
-                    }}
-                    role="columnheader"
-                  >
-                    {headerContent(col)}
-                  </div>
-                ))}
+                {orderedColumns.value.map((col) => {
+                  const colSticky = sticky.value.byField[col.field];
+                  return (
+                    <div
+                      key={col.field}
+                      data-sticky={
+                        colSticky?.sticky === false ? undefined : colSticky?.sticky
+                      }
+                      class={`flex shrink-0 items-center border-r border-slate-200 bg-slate-50 px-3 font-medium text-slate-700 last:border-r-0 ${stickyEdgeClass(colSticky)}`}
+                      style={{
+                        width: col.width ?? 120,
+                        height: props.rowHeight,
+                        ...stickyCellStyle(colSticky, 30),
+                      }}
+                      role="columnheader"
+                    >
+                      {headerContent(col)}
+                    </div>
+                  );
+                })}
               </div>
             ) : null}
 
@@ -398,8 +457,18 @@ export const VirtualGrid = defineComponent({
                         >
                           {showSelection.value ? (
                             <div
-                              class="flex w-12 shrink-0 items-center justify-center border-r border-slate-100"
+                              data-sticky={sticky.value.selection ? "left" : undefined}
+                              class={`flex w-12 shrink-0 items-center justify-center border-r border-slate-100 ${zebra}`}
                               role="gridcell"
+                              style={
+                                sticky.value.selection
+                                  ? {
+                                      position: "sticky",
+                                      left: `${sticky.value.selection.left}px`,
+                                      zIndex: 20,
+                                    }
+                                  : undefined
+                              }
                               onClick={(e: MouseEvent) => e.stopPropagation()}
                             >
                               <Checkbox
@@ -411,22 +480,43 @@ export const VirtualGrid = defineComponent({
                           ) : null}
                           {props.showRowNumber ? (
                             <div
-                              class="flex w-14 shrink-0 items-center justify-center border-r border-slate-100 text-slate-500"
+                              data-sticky={sticky.value.rowNumber ? "left" : undefined}
+                              class={`flex w-14 shrink-0 items-center justify-center border-r border-slate-100 text-slate-500 ${zebra}`}
                               role="gridcell"
+                              style={
+                                sticky.value.rowNumber
+                                  ? {
+                                      position: "sticky",
+                                      left: `${sticky.value.rowNumber.left}px`,
+                                      zIndex: 20,
+                                    }
+                                  : undefined
+                              }
                             >
                               {displayIndex}
                             </div>
                           ) : null}
-                          {visibleColumns.value.map((col) => (
-                            <div
-                              key={col.field}
-                              class="flex shrink-0 items-center overflow-hidden border-r border-slate-100 px-3 text-ellipsis whitespace-nowrap last:border-r-0"
-                              style={{ width: col.width ?? 120 }}
-                              role="gridcell"
-                            >
-                              {cellContent(row, col, rowIndex)}
-                            </div>
-                          ))}
+                          {orderedColumns.value.map((col) => {
+                            const colSticky = sticky.value.byField[col.field];
+                            return (
+                              <div
+                                key={col.field}
+                                data-sticky={
+                                  colSticky?.sticky === false
+                                    ? undefined
+                                    : colSticky?.sticky
+                                }
+                                class={`flex shrink-0 items-center overflow-hidden border-r border-slate-100 px-3 text-ellipsis whitespace-nowrap last:border-r-0 ${zebra} ${stickyEdgeClass(colSticky)}`}
+                                style={{
+                                  width: col.width ?? 120,
+                                  ...stickyCellStyle(colSticky, 20),
+                                }}
+                                role="gridcell"
+                              >
+                                {cellContent(row, col, rowIndex)}
+                              </div>
+                            );
+                          })}
                         </div>
                       );
                     })}
