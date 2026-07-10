@@ -113,4 +113,209 @@ describe("VirtualGrid (React)", () => {
     expect(bodyRows.length).toBeGreaterThan(0);
     expect(bodyRows.length).toBeLessThan(80);
   });
+
+  it("toggles multiple selection via row checkbox", async () => {
+    const user = userEvent.setup();
+    const onSelectedKeysChange = vi.fn();
+    render(
+      <VirtualGrid
+        data={data}
+        columns={columns}
+        showRowNumber={false}
+        selectionMode="multiple"
+        defaultSelectedKeys={[]}
+        onSelectedKeysChange={onSelectedKeysChange}
+      />,
+    );
+    await user.click(screen.getByRole("checkbox", { name: "选择行 1" }));
+    expect(onSelectedKeysChange).toHaveBeenLastCalledWith(["1"]);
+  });
+
+  it("replaces selection in single mode", async () => {
+    const user = userEvent.setup();
+    const onSelectedKeysChange = vi.fn();
+    render(
+      <VirtualGrid
+        data={data}
+        columns={columns}
+        showRowNumber={false}
+        selectionMode="single"
+        defaultSelectedKeys={["1"]}
+        onSelectedKeysChange={onSelectedKeysChange}
+      />,
+    );
+    expect(screen.queryByRole("checkbox", { name: "全选" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: "选择行 2" }));
+    expect(onSelectedKeysChange).toHaveBeenLastCalledWith(["2"]);
+  });
+
+  it("select-all uses full data in local pagination", async () => {
+    const user = userEvent.setup();
+    const onSelectedKeysChange = vi.fn();
+    const many = [
+      { id: "1", code: "a", name: "A" },
+      { id: "2", code: "b", name: "B" },
+      { id: "3", code: "c", name: "C" },
+    ];
+    render(
+      <VirtualGrid
+        data={many}
+        columns={columns}
+        showRowNumber={false}
+        selectionMode="multiple"
+        pagination
+        paginationMode="local"
+        defaultPageSize={2}
+        defaultSelectedKeys={[]}
+        onSelectedKeysChange={onSelectedKeysChange}
+      />,
+    );
+    expect(screen.getByText("A")).toBeInTheDocument();
+    expect(screen.queryByText("C")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: "全选" }));
+    expect(onSelectedKeysChange).toHaveBeenLastCalledWith(["1", "2", "3"]);
+  });
+
+  it("select-all uses current page data in remote mode", async () => {
+    const user = userEvent.setup();
+    const onSelectedKeysChange = vi.fn();
+    render(
+      <VirtualGrid
+        data={data}
+        columns={columns}
+        showRowNumber={false}
+        selectionMode="multiple"
+        pagination
+        paginationMode="remote"
+        total={100}
+        page={1}
+        pageSize={10}
+        defaultSelectedKeys={[]}
+        onSelectedKeysChange={onSelectedKeysChange}
+      />,
+    );
+    await user.click(screen.getByRole("checkbox", { name: "全选" }));
+    expect(onSelectedKeysChange).toHaveBeenLastCalledWith(["1", "2"]);
+  });
+
+  it("keeps selectedKeys across local page change", async () => {
+    const user = userEvent.setup();
+    const many = Array.from({ length: 5 }, (_, i) => ({
+      id: String(i + 1),
+      code: `c${i + 1}`,
+      name: `n${i + 1}`,
+    }));
+    render(
+      <VirtualGrid
+        data={many}
+        columns={columns}
+        showRowNumber={false}
+        selectionMode="multiple"
+        pagination
+        paginationMode="local"
+        defaultPage={1}
+        defaultPageSize={2}
+        defaultSelectedKeys={["1"]}
+      />,
+    );
+    expect(screen.getByRole("checkbox", { name: "选择行 1" })).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "下一页" }));
+    expect(screen.queryByRole("checkbox", { name: "选择行 1" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "上一页" }));
+    expect(screen.getByRole("checkbox", { name: "选择行 1" })).toBeChecked();
+  });
+
+  it("slices rows in local pagination", () => {
+    const many = Array.from({ length: 5 }, (_, i) => ({
+      id: String(i + 1),
+      code: `c${i + 1}`,
+      name: `n${i + 1}`,
+    }));
+    render(
+      <VirtualGrid
+        data={many}
+        columns={columns}
+        showRowNumber={false}
+        pagination
+        paginationMode="local"
+        defaultPage={1}
+        defaultPageSize={2}
+      />,
+    );
+    expect(screen.getByText("n1")).toBeInTheDocument();
+    expect(screen.getByText("n2")).toBeInTheDocument();
+    expect(screen.queryByText("n3")).not.toBeInTheDocument();
+    expect(screen.getByTestId("virtual-grid-pagination")).toBeInTheDocument();
+  });
+
+  it("does not slice in remote mode and emits page change", async () => {
+    const user = userEvent.setup();
+    const onPageChange = vi.fn();
+    render(
+      <VirtualGrid
+        data={data}
+        columns={columns}
+        showRowNumber={false}
+        pagination
+        paginationMode="remote"
+        total={50}
+        page={1}
+        pageSize={10}
+        onPageChange={onPageChange}
+      />,
+    );
+    expect(screen.getByText("Sagi")).toBeInTheDocument();
+    expect(screen.getByText("Nancy")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "下一页" }));
+    expect(onPageChange).toHaveBeenCalledWith(2);
+  });
+
+  it("resets to page 1 when pageSize changes", async () => {
+    const user = userEvent.setup();
+    const onPageChange = vi.fn();
+    const onPageSizeChange = vi.fn();
+    const many = Array.from({ length: 30 }, (_, i) => ({
+      id: String(i + 1),
+      code: `c${i + 1}`,
+      name: `n${i + 1}`,
+    }));
+    render(
+      <VirtualGrid
+        data={many}
+        columns={columns}
+        showRowNumber={false}
+        pagination
+        paginationMode="local"
+        defaultPage={2}
+        defaultPageSize={10}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+      />,
+    );
+    const select = within(screen.getByTestId("virtual-grid-pagination")).getByLabelText(
+      "每页条数",
+    );
+    await user.selectOptions(select, "20");
+    expect(onPageSizeChange).toHaveBeenCalledWith(20);
+    expect(onPageChange).toHaveBeenCalledWith(1);
+  });
+
+  it("does not fire onRowClick when clicking row checkbox", async () => {
+    const user = userEvent.setup();
+    const onRowClick = vi.fn();
+    const onSelectedKeysChange = vi.fn();
+    render(
+      <VirtualGrid
+        data={data}
+        columns={columns}
+        showRowNumber={false}
+        selectionMode="multiple"
+        onRowClick={onRowClick}
+        onSelectedKeysChange={onSelectedKeysChange}
+      />,
+    );
+    await user.click(screen.getByRole("checkbox", { name: "选择行 1" }));
+    expect(onSelectedKeysChange).toHaveBeenCalled();
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
 });
