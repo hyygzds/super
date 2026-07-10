@@ -11,3 +11,5 @@ export {
 } from "./components/Tabs";
 export { Pagination } from "./components/Pagination";
 export { Checkbox, CheckboxGroup } from "./components/Checkbox";
+export { VirtualGrid } from "./components/VirtualGrid";
+export type { VirtualGridColumn } from "./components/VirtualGrid";
