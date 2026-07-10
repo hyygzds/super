@@ -2,7 +2,16 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { useState } from "react";
 import { VirtualGrid, type VirtualGridColumn } from "./VirtualGrid";
 
-type Row = { id: string; code: string; name: string };
+type Row = {
+  id: string;
+  code: string;
+  name: string;
+  category?: string;
+  owner?: string;
+  status?: string;
+  amount?: string;
+  updatedAt?: string;
+};
 
 const columns: VirtualGridColumn<Row>[] = [
   { field: "code", title: "编号", width: 120 },
@@ -40,6 +49,27 @@ const paginationRemoteAllData: Row[] = Array.from({ length: 47 }, (_, i) => ({
   code: String(i + 1).padStart(4, "0"),
   name: `Remote ${i + 1}`,
 }));
+
+const fixedData: Row[] = Array.from({ length: 12 }, (_, i) => ({
+  id: String(i + 1),
+  code: `P-${String(i + 1).padStart(4, "0")}`,
+  name: `Product ${i + 1}`,
+  category: ["Hardware", "Software", "Service"][i % 3],
+  owner: ["Sagi", "Nancy", "Alice", "Bob"][i % 4],
+  status: ["Draft", "Active", "Paused"][i % 3],
+  amount: `$${(1200 + i * 137).toLocaleString()}`,
+  updatedAt: `2026-07-${String((i % 28) + 1).padStart(2, "0")}`,
+}));
+
+const fixedColumns: VirtualGridColumn<Row>[] = [
+  { field: "code", title: "编号", width: 120 },
+  { field: "name", title: "名称", width: 180 },
+  { field: "category", title: "分类", width: 160 },
+  { field: "owner", title: "负责人", width: 140 },
+  { field: "status", title: "状态", width: 140 },
+  { field: "amount", title: "金额", width: 140 },
+  { field: "updatedAt", title: "更新日期", width: 160 },
+];
 
 const meta = {
   title: "React/VirtualGrid",
@@ -174,6 +204,53 @@ export const SelectionSingle: Story = {
       />
     );
   },
+};
+
+export const FixedLeft: Story = {
+  render: () => (
+    <div className="h-80 w-[420px]">
+      <VirtualGrid
+        data={fixedData}
+        columns={fixedColumns.map((col) =>
+          col.field === "code" || col.field === "name"
+            ? { ...col, fixed: "left" }
+            : col,
+        )}
+        selectionMode="multiple"
+        showRowNumber
+      />
+    </div>
+  ),
+};
+
+export const FixedRight: Story = {
+  render: () => (
+    <div className="h-80 w-[420px]">
+      <VirtualGrid
+        data={fixedData}
+        columns={fixedColumns.map((col) =>
+          col.field === "updatedAt" ? { ...col, fixed: "right" } : col,
+        )}
+        showRowNumber={false}
+      />
+    </div>
+  ),
+};
+
+export const FixedBoth: Story = {
+  render: () => (
+    <div className="h-80 w-[420px]">
+      <VirtualGrid
+        data={fixedData}
+        columns={fixedColumns.map((col) => {
+          if (col.field === "code") return { ...col, fixed: "left" };
+          if (col.field === "updatedAt") return { ...col, fixed: "right" };
+          return col;
+        })}
+        showRowNumber
+      />
+    </div>
+  ),
 };
 
 export const PaginationLocal: Story = {
