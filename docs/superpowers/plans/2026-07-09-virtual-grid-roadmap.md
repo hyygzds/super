@@ -49,8 +49,8 @@
 4. ~~完成 [`2026-07-10-virtual-grid-p0.md`](./2026-07-10-virtual-grid-p0.md)~~
 5. ~~完成 [`2026-07-10-input.md`](./2026-07-10-input.md)~~
 6. ~~完成 [`2026-07-10-virtual-grid-p1.md`](./2026-07-10-virtual-grid-p1.md)~~
-7. 执行 [`2026-07-10-virtual-grid-p2.md`](./2026-07-10-virtual-grid-p2.md)
-8. 其后：VirtualGrid P3（分组/合并）或自动行高详细计划
+7. ~~完成 [`2026-07-10-virtual-grid-p2.md`](./2026-07-10-virtual-grid-p2.md)~~
+8. 下一优先：VirtualGrid P3（分组/合并）或自动行高详细计划
 
 ---
 
