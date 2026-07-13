@@ -9,3 +9,5 @@ export {
   TabsTrigger,
   TabsPanel,
 } from "./components/Tabs";
+export { Form, FormItem } from "./components/Form";
+export type { FormProps, FormItemProps } from "./components/Form";
