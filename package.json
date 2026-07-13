@@ -20,6 +20,8 @@
     "build:vue": "npm run build -w @component-ai/vue-ui",
     "build:grid-core": "npm run build -w @component-ai/grid-core",
     "test:grid-core": "npm run test -w @component-ai/grid-core",
+    "build:form-core": "npm run build -w @component-ai/form-core",
+    "test:form-core": "npm run test -w @component-ai/form-core",
     "storybook:react": "npm run storybook -w @component-ai/storybook-react",
     "storybook:vue": "npm run storybook -w @component-ai/storybook-vue",
     "build-storybook:react": "npm run build-storybook -w @component-ai/storybook-react",
