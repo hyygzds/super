@@ -18,7 +18,7 @@
 
 | 顺序 | 计划文件 | 交付物 | 阻塞关系 |
 |------|----------|--------|----------|
-| 1 | *待写* `YYYY-MM-DD-form-core-and-form.md` | `@component-ai/form-core` + 双端 `Form` / `FormItem`（P0） | 无 |
+| 1 | [`2026-07-13-form-core-and-form.md`](./2026-07-13-form-core-and-form.md) | `@component-ai/form-core` + 双端 `Form` / `FormItem`（P0） | 无 |
 | 2 | *待写* `YYYY-MM-DD-input-controls.md` | 双端 `Input` / `InputNumber` / `Textarea`（P1） | 建议在 Form 接线 Story 前；可与 1 部分并行，但完整 Form demo 依赖本项 |
 | 3 | *待写* `YYYY-MM-DD-choice-controls.md` | 双端 `Radio`/`RadioGroup` / `Switch` + Checkbox/Select 接入 Story（P2） | 依赖 1；控件本身可不依赖 Form，接入 Story 依赖 1 |
 
@@ -35,8 +35,8 @@
 
 ## 当前应执行
 
-1. 用 `writing-plans` 编写并执行 **P0**：`form-core` + `Form` / `FormItem`
-2. 再写 P1 输入控件计划并执行
+1. 执行 [`2026-07-13-form-core-and-form.md`](./2026-07-13-form-core-and-form.md)（P0）
+2. 再用 `writing-plans` 编写并执行 P1 输入控件计划
 3. 再写 P2 选择类控件 + 接入 Story
 
 ---
