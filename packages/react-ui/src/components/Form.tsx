@@ -218,7 +218,7 @@ export function FormItem({
         </span>
       )}
       {(required || rules?.some((r) => r.required)) && (
-        <span className="sr-only">(必填项)</span>
+        <span className="sr-only">必填</span>
       )}
       {label}
     </label>

@@ -35,7 +35,8 @@ describe("Form (React)", () => {
     const input = screen.getByLabelText("邮箱");
     await user.click(input);
     await user.tab();
-    expect(await screen.findByText("必填")).toBeInTheDocument();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("必填");
     expect(input).toHaveAttribute("aria-invalid", "true");
   });
 
@@ -74,7 +75,8 @@ describe("Form (React)", () => {
     const user = userEvent.setup();
     render(<Harness />);
     await user.click(screen.getByRole("button", { name: "校验" }));
-    expect(await screen.findByText("必填")).toBeInTheDocument();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("必填");
     expect(onFinish).not.toHaveBeenCalled();
   });
 });
