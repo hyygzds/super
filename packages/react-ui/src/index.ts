@@ -16,3 +16,5 @@ export type {
   TabsTriggerProps,
   TabsPanelProps,
 } from "./components/Tabs";
+export { Form, FormItem } from "./components/Form";
+export type { FormProps, FormItemProps, FormHandle } from "./components/Form";
