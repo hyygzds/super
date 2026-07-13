@@ -59,6 +59,35 @@ describe("Form (Vue)", () => {
     expect(input.attributes("aria-invalid")).toBe("true");
   });
 
+  it("collects values from input events without waiting for change", async () => {
+    const onFinish = vi.fn();
+    const wrapper = mount(
+      defineComponent({
+        setup() {
+          return () => (
+            <Form initialValues={{ email: "" }} onFinish={onFinish}>
+              <FormItem
+                name="email"
+                label="邮箱"
+                rules={[{ required: true, message: "必填" }]}
+              >
+                <input aria-label="邮箱" />
+              </FormItem>
+              <button type="submit">提交</button>
+            </Form>
+          );
+        },
+      }),
+    );
+    const input = wrapper.find('input[aria-label="邮箱"]');
+    const el = input.element as HTMLInputElement;
+    el.value = "typed@ex.com";
+    await input.trigger("input");
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    expect(onFinish).toHaveBeenCalledWith({ email: "typed@ex.com" });
+  });
+
   it("emits finishFailed when submit invalid", async () => {
     const onFinish = vi.fn();
     const onFinishFailed = vi.fn();

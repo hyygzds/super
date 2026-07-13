@@ -143,7 +143,7 @@ export const Form = defineComponent({
       <form
         class={["flex flex-col gap-4", props.class].filter(Boolean).join(" ")}
         onSubmit={(e) => void onSubmit(e)}
-        noValidate
+        novalidate
       >
         {slots.default?.()}
       </form>
@@ -220,16 +220,21 @@ export const FormItem = defineComponent({
         Boolean((first.props as { disabled?: boolean } | null)?.disabled) ||
         ctx.disabled.value;
 
+      const syncValue = (eventOrValue: unknown) => {
+        if (!props.name) return;
+        ctx.store.setFieldValue(props.name, readChangeValue(eventOrValue));
+      };
+
       const injected = cloneVNode(first, {
         id: controlId,
         value: (value as string | number | undefined) ?? "",
         disabled: childDisabled,
         "aria-invalid": showError ? true : undefined,
         "aria-describedby": showError ? errorId : undefined,
-        onChange: (eventOrValue: unknown) => {
-          if (!props.name) return;
-          ctx.store.setFieldValue(props.name, readChangeValue(eventOrValue));
-        },
+        // Native text inputs fire `input` per keystroke; `change` on commit.
+        // Inject both so Vue matches React onChange semantics.
+        onInput: syncValue,
+        onChange: syncValue,
         onBlur: () => {
           if (props.name) void ctx.store.validateField(props.name);
         },
