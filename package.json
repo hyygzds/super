@@ -16,6 +16,7 @@
   },
   "scripts": {
     "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
     "build:react": "npm run build -w @component-ai/react-ui",
     "build:vue": "npm run build -w @component-ai/vue-ui",
     "build:grid-core": "npm run build -w @component-ai/grid-core",
