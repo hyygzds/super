@@ -29,7 +29,7 @@ export default defineConfig({
       fileName: "index",
     },
     rollupOptions: {
-      external: ["vue"],
+      external: ["vue", "@component-ai/grid-core"],
       output: {
         assetFileNames: "style.css",
       },

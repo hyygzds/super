@@ -16,3 +16,12 @@ export type {
   TabsTriggerProps,
   TabsPanelProps,
 } from "./components/Tabs";
+export { Pagination } from "./components/Pagination";
+export type { PaginationProps } from "./components/Pagination";
+export { Checkbox } from "./components/Checkbox";
+export type { CheckboxProps } from "./components/Checkbox";
+export { VirtualGrid } from "./components/VirtualGrid";
+export type {
+  VirtualGridProps,
+  VirtualGridColumn,
+} from "./components/VirtualGrid";

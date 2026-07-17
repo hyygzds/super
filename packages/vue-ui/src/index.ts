@@ -9,3 +9,7 @@ export {
   TabsTrigger,
   TabsPanel,
 } from "./components/Tabs";
+export { Pagination } from "./components/Pagination";
+export { Checkbox } from "./components/Checkbox";
+export { VirtualGrid } from "./components/VirtualGrid";
+export type { VirtualGridColumn } from "./components/VirtualGrid";
