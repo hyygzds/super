@@ -7,7 +7,10 @@ const monorepoRoot = join(storybookDir, "..", "..", "..");
 /** @type {import("@storybook/react-vite").StorybookConfig} */
 const config = {
   // Relative to `.storybook/` — absolute Windows paths break Storybook's glob.
-  stories: ["../../../packages/react-ui/src/**/*.stories.@(ts|tsx)"],
+  stories: [
+    "../../../packages/react-ui/src/**/*.stories.@(ts|tsx)",
+    "../../../packages/ai-chat/src/**/*.stories.@(ts|tsx)",
+  ],
   addons: ["@storybook/addon-essentials"],
   framework: {
     name: "@storybook/react-vite",

@@ -15,7 +15,7 @@ export default defineConfig({
       insertTypesEntry: true,
       rollupTypes: true,
       tsconfigPath: resolve(rootDir, "tsconfig.json"),
-      exclude: ["**/*.test.*", "**/vitest.setup.ts"],
+      exclude: ["**/*.test.*", "**/*.stories.*", "**/vitest.setup.ts"],
     }),
   ],
   build: {
