@@ -29,6 +29,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Workspace packages export dist/; fresh clones have no dist until build.
+      - name: Build shared packages
+        run: npm run build -w @component-ai/grid-core
+
       - name: Test
         run: npm test
 
