@@ -37,11 +37,21 @@ export const openaiTransport: ChatTransport = {
     }
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
+    let lineBuffer = "";
     try {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const text = extractDeltaFromSseChunk(decoder.decode(value, { stream: true }));
+        lineBuffer += decoder.decode(value, { stream: true });
+        const parts = lineBuffer.split(/\r?\n/);
+        lineBuffer = parts.pop() ?? "";
+        if (parts.length === 0) continue;
+        const text = extractDeltaFromSseChunk(parts.join("\n") + "\n");
+        if (text) handlers.onToken(text);
+      }
+      lineBuffer += decoder.decode();
+      if (lineBuffer.trim()) {
+        const text = extractDeltaFromSseChunk(lineBuffer.endsWith("\n") ? lineBuffer : `${lineBuffer}\n`);
         if (text) handlers.onToken(text);
       }
       handlers.onDone();

@@ -100,6 +100,10 @@ export function useChat(options: UseChatOptions): UseChatReturn {
 
       const { apiUrl, apiKey, model, transport, headers } = optionsRef.current;
 
+      const isActive = () =>
+        abortControllerRef.current === controller &&
+        streamingAssistantIdRef.current === assistantId;
+
       await (transport ?? openaiTransport).stream(
         {
           apiUrl,
@@ -111,12 +115,14 @@ export function useChat(options: UseChatOptions): UseChatReturn {
         },
         {
           onToken: (text) => {
+            if (!isActive() || controller.signal.aborted) return;
             updateMessage(assistantId, (message) => ({
               ...message,
               content: message.content + text,
             }));
           },
           onDone: () => {
+            if (!isActive() || controller.signal.aborted) return;
             updateMessage(assistantId, (message) => ({
               ...message,
               status: "done",
@@ -124,6 +130,7 @@ export function useChat(options: UseChatOptions): UseChatReturn {
             setStatus("idle");
           },
           onError: (err) => {
+            if (!isActive() || controller.signal.aborted) return;
             updateMessage(assistantId, (message) => ({
               ...message,
               status: "error",
@@ -134,7 +141,6 @@ export function useChat(options: UseChatOptions): UseChatReturn {
           },
         },
       );
-
       if (abortControllerRef.current === controller) {
         abortControllerRef.current = null;
         streamingAssistantIdRef.current = null;

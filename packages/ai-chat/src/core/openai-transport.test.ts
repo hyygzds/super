@@ -124,4 +124,22 @@ describe("openaiTransport", () => {
 
     expect(onError).not.toHaveBeenCalled();
   });
+
+  it("reassembles SSE lines split across fetch chunks", async () => {
+    const full = sseLine("Hi");
+    const mid = Math.floor(full.length / 2);
+    const fetchMock = mockFetchStream([full.slice(0, mid), full.slice(mid)]);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const tokens: string[] = [];
+    await openaiTransport.stream(baseRequest(), {
+      onToken: (text) => tokens.push(text),
+      onDone: () => {},
+      onError: () => {
+        throw new Error("unexpected onError");
+      },
+    });
+
+    expect(tokens.join("")).toBe("Hi");
+  });
 });
