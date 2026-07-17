@@ -8,6 +8,7 @@
     "build-storybook": "storybook build -o storybook-static"
   },
   "dependencies": {
+    "@component-ai/ai-chat": "^1.0.0",
     "@component-ai/react-ui": "^1.0.0"
   },
   "devDependencies": {
