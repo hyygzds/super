@@ -11,3 +11,6 @@ export type {
 export { createMessageId } from "./core/id";
 export { extractDeltaFromSseChunk } from "./core/parse-sse";
 export { openaiTransport } from "./core/openai-transport";
+
+export { useChat } from "./useChat";
+export type { UseChatOptions, UseChatReturn, UseChatStatus } from "./useChat";
