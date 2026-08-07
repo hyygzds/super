@@ -23,3 +23,11 @@ export {
 export { flattenLeafColumns, buildHeaderRows } from "./columns";
 export { buildGroupedRows } from "./group";
 export { normalizeSpans } from "./span";
+export type { TreeFlatRow, FlattenTreeInput, CascadeSelectInput } from "./tree";
+export {
+  flattenTree,
+  toggleExpandKey,
+  collectDescendantKeys,
+  cascadeToggleKey,
+  isTreeIndeterminate,
+} from "./tree";

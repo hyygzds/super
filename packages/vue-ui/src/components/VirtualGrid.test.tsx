@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { h } from "vue";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { VirtualGrid } from "./VirtualGrid";
 import type { VirtualGridColumn } from "./VirtualGrid";
 
@@ -318,5 +318,93 @@ describe("VirtualGrid (Vue) pagination", () => {
           .element as HTMLInputElement
       ).checked,
     ).toBe(true);
+  });
+});
+
+const treeData = [
+  {
+    id: "1",
+    name: "Parent",
+    children: [
+      { id: "1-1", name: "Child A" },
+      { id: "1-2", name: "Child B" },
+    ],
+  },
+  { id: "2", name: "Leaf" },
+];
+
+describe("VirtualGrid (Vue) P4 tree / expandable", () => {
+  it("expands a tree node to reveal children", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: { columns, data: treeData, tree: true },
+    });
+    expect(wrapper.text()).toContain("Parent");
+    expect(wrapper.text()).not.toContain("Child A");
+
+    await wrapper.find('button[aria-label="展开 Parent"]').trigger("click");
+
+    expect(wrapper.text()).toContain("Child A");
+    expect(wrapper.text()).toContain("Child B");
+  });
+
+  it("cascadeChild selects descendants when parent is checked", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns,
+        data: treeData,
+        tree: true,
+        selectable: true,
+        cascadeChild: true,
+        defaultExpandedKeys: ["1"],
+      },
+    });
+
+    const parentRow = wrapper
+      .findAll('[role="row"]')
+      .find((row) => row.text().includes("Parent"))!;
+    await parentRow.find('input[type="checkbox"]').setValue(true);
+
+    const keys = wrapper.emitted("update:selectedKeys")?.[0][0] as string[];
+    expect(keys).toEqual(expect.arrayContaining(["1", "1-1", "1-2"]));
+  });
+
+  it("expandable shows detail row via #expand slot", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns,
+        data: makeRows(2),
+        expandable: true,
+      },
+      slots: {
+        expand: ({ row }: { row: Record<string, unknown> }) =>
+          h("div", `Detail:${String(row.name)}`),
+      },
+    });
+    expect(wrapper.text()).not.toContain("Detail:Row 1");
+
+    await wrapper.find('button[aria-label="展开行 1"]').trigger("click");
+
+    expect(wrapper.text()).toContain("Detail:Row 1");
+  });
+
+  it("loadData fills children when expanding a lazy node", async () => {
+    const loadData = vi.fn(async () => [
+      { id: "lazy-1", name: "Loaded Child" },
+    ]);
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns,
+        data: [{ id: "root", name: "Lazy Root", __hasChildren: true }],
+        tree: true,
+        loadData,
+      },
+    });
+    expect(wrapper.text()).not.toContain("Loaded Child");
+
+    await wrapper.find('button[aria-label="展开 Lazy Root"]').trigger("click");
+    await flushPromises();
+
+    expect(loadData).toHaveBeenCalled();
+    expect(wrapper.text()).toContain("Loaded Child");
   });
 });

@@ -3,6 +3,7 @@ import { VirtualGrid } from "./VirtualGrid";
 import type {
   VirtualGridCellContext,
   VirtualGridColumn,
+  VirtualGridExpandContext,
 } from "./VirtualGrid";
 
 const columns: VirtualGridColumn[] = [
@@ -273,4 +274,107 @@ export const MergeCells: Story = {
       />
     );
   },
+};
+
+const treeStoryData = [
+  {
+    id: "1",
+    name: "研发中心",
+    children: [
+      {
+        id: "1-1",
+        name: "前端组",
+        children: [
+          { id: "1-1-1", name: "React" },
+          { id: "1-1-2", name: "Vue" },
+        ],
+      },
+      { id: "1-2", name: "后端组" },
+    ],
+  },
+  {
+    id: "2",
+    name: "设计中心",
+    children: [{ id: "2-1", name: "视觉" }],
+  },
+  { id: "3", name: "独立叶节点" },
+];
+
+export const Tree: Story = {
+  render: () => (
+    <VirtualGrid
+      columns={[
+        { field: "name", title: "名称", width: 240 },
+        { field: "id", title: "标识", width: 100 },
+      ]}
+      data={treeStoryData}
+      tree
+      defaultExpandedKeys={["1"]}
+      height={360}
+    />
+  ),
+};
+
+export const TreeSelection: Story = {
+  render: () => (
+    <VirtualGrid
+      columns={[
+        { field: "name", title: "名称", width: 240 },
+        { field: "id", title: "标识", width: 100 },
+      ]}
+      data={treeStoryData}
+      tree
+      selectable
+      cascadeChild
+      cascadeParent
+      defaultExpandedKeys={["1", "1-1"]}
+      height={360}
+    />
+  ),
+};
+
+export const LoadAsync: Story = {
+  render: () => {
+    const loadData = async (row: Record<string, unknown>) => {
+      await new Promise((r) => setTimeout(r, 400));
+      const id = String(row.id);
+      return [
+        { id: `${id}-a`, name: `${String(row.name)} / 异步子节点 A` },
+        { id: `${id}-b`, name: `${String(row.name)} / 异步子节点 B` },
+      ];
+    };
+    return (
+      <VirtualGrid
+        columns={[
+          { field: "name", title: "名称", width: 280 },
+          { field: "id", title: "标识", width: 120 },
+        ]}
+        data={[
+          { id: "lazy-1", name: "懒加载根 A", __hasChildren: true },
+          { id: "lazy-2", name: "懒加载根 B", __hasChildren: true },
+        ]}
+        tree
+        loadData={loadData}
+        height={320}
+      />
+    );
+  },
+};
+
+export const ExpandRow: Story = {
+  render: () => (
+    <VirtualGrid
+      columns={columns}
+      data={makeRows(8)}
+      expandable
+      height={360}
+      v-slots={{
+        expand: ({ row, rowIndex }: VirtualGridExpandContext) => (
+          <div class="px-2 py-1 text-slate-600">
+            详情 #{rowIndex + 1}：{String(row.fullName ?? row.name)}
+          </div>
+        ),
+      }}
+    />
+  ),
 };

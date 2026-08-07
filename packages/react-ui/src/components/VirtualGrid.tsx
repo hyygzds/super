@@ -1,20 +1,25 @@
 import {
   buildGroupedRows,
   buildHeaderRows,
+  cascadeToggleKey,
   clearKeys,
   computeVirtualWindow,
   flattenLeafColumns,
+  flattenTree,
   isAllSelected,
   isIndeterminate,
+  isTreeIndeterminate,
   normalizeSpans,
   selectAllKeys,
   slicePage,
+  toggleExpandKey,
   toggleKey,
   type DisplayRow,
   type GridColumn,
   type GroupByConfig,
   type HeaderCell,
   type SpanMethod,
+  type TreeFlatRow,
 } from "@component-ai/grid-core";
 import {
   useEffect,
@@ -47,6 +52,11 @@ export type VirtualGridColumn = GridColumn & {
 
 export type { GroupByConfig, SpanMethod };
 
+export type VirtualGridExpandedRowContext = {
+  row: Record<string, unknown>;
+  rowIndex: number;
+};
+
 export type VirtualGridProps = {
   columns: VirtualGridColumn[];
   data: Record<string, unknown>[];
@@ -77,16 +87,34 @@ export type VirtualGridProps = {
   onPageSizeChange?: (pageSize: number) => void;
   groupBy?: GroupByConfig;
   spanMethod?: SpanMethod;
+  tree?: boolean;
+  childrenField?: string;
+  expandedKeys?: string[];
+  defaultExpandedKeys?: string[];
+  onExpandedKeysChange?: (keys: string[]) => void;
+  cascadeParent?: boolean;
+  cascadeChild?: boolean;
+  loadData?: (
+    row: Record<string, unknown>,
+  ) => Promise<Record<string, unknown>[]>;
+  expandable?: boolean | ((row: Record<string, unknown>) => boolean);
+  expandedRowKeys?: string[];
+  defaultExpandedRowKeys?: string[];
+  onExpandedRowKeysChange?: (keys: string[]) => void;
+  renderExpandedRow?: (ctx: VirtualGridExpandedRowContext) => ReactNode;
   renderCell?: (ctx: VirtualGridCellContext) => ReactNode;
   renderHeader?: (ctx: VirtualGridHeaderContext) => ReactNode;
 };
 
 const ROW_NUMBER_WIDTH = 48;
 const SELECTION_WIDTH = 40;
+const EXPAND_WIDTH = 32;
 const DEFAULT_COL_WIDTH = 120;
+const TREE_INDENT = 16;
 
 type LayoutCol =
   | { kind: "selection"; width: number; stickyLeft: number }
+  | { kind: "expand"; width: number; stickyLeft: number }
   | { kind: "rowNumber"; width: number; stickyLeft: number }
   | {
       kind: "data";
@@ -94,6 +122,15 @@ type LayoutCol =
       width: number;
       stickyLeft?: number;
       stickyRight?: number;
+    };
+
+type BodyDisplayRow =
+  | DisplayRow
+  | {
+      kind: "detail";
+      row: Record<string, unknown>;
+      dataIndex: number;
+      key: string;
     };
 
 function isNodeDevelopment(): boolean {
@@ -117,6 +154,7 @@ function buildLayout(
   visibleColumns: VirtualGridColumn[],
   selectable: boolean,
   showRowNumber: boolean,
+  showExpandCol: boolean,
 ): LayoutCol[] {
   const hasFixed = visibleColumns.some((c) => c.fixed);
   const layout: LayoutCol[] = [];
@@ -126,13 +164,17 @@ function buildLayout(
     layout.push({ kind: "selection", width: SELECTION_WIDTH, stickyLeft: left });
     left += SELECTION_WIDTH;
   }
+  if (showExpandCol) {
+    layout.push({ kind: "expand", width: EXPAND_WIDTH, stickyLeft: left });
+    left += EXPAND_WIDTH;
+  }
   if (showRowNumber) {
     layout.push({ kind: "rowNumber", width: ROW_NUMBER_WIDTH, stickyLeft: left });
     left += ROW_NUMBER_WIDTH;
   }
 
   // Preserve leaf DFS order so header colspan aligns with body columns.
-  // Sticky offsets accumulate only across leading sticky (sel / row# / fixed-left) cols.
+  // Sticky offsets accumulate only across leading sticky (sel / expand / row# / fixed-left) cols.
   const rightOffset = new Map<string, number>();
   let right = 0;
   for (let i = visibleColumns.length - 1; i >= 0; i--) {
@@ -173,7 +215,11 @@ function stickyStyle(
   isHeader: boolean,
   bg: string,
 ): CSSProperties | undefined {
-  if (item.kind === "selection" || item.kind === "rowNumber") {
+  if (
+    item.kind === "selection" ||
+    item.kind === "rowNumber" ||
+    item.kind === "expand"
+  ) {
     return {
       position: "sticky",
       left: item.stickyLeft,
@@ -247,6 +293,59 @@ function placeHeaderCells(
   return placed;
 }
 
+function setChildrenAtKey(
+  rows: Record<string, unknown>[],
+  key: string,
+  children: Record<string, unknown>[],
+  idField: string,
+  childrenField: string,
+  path = "r",
+): Record<string, unknown>[] {
+  return rows.map((row, index) => {
+    const rowKey =
+      row[idField] !== undefined && row[idField] !== null
+        ? String(row[idField])
+        : `${path}/${index}`;
+    if (rowKey === key) {
+      const next: Record<string, unknown> = {
+        ...row,
+        [childrenField]: children,
+      };
+      delete next.__hasChildren;
+      return next;
+    }
+    const kids = row[childrenField];
+    if (Array.isArray(kids)) {
+      return {
+        ...row,
+        [childrenField]: setChildrenAtKey(
+          kids as Record<string, unknown>[],
+          key,
+          children,
+          idField,
+          childrenField,
+          `${path}/${index}`,
+        ),
+      };
+    }
+    return row;
+  });
+}
+
+function rowLabel(row: Record<string, unknown>, key: string): string {
+  const name = row.name;
+  return typeof name === "string" && name.length > 0 ? name : key;
+}
+
+function isRowExpandable(
+  expandable: boolean | ((row: Record<string, unknown>) => boolean) | undefined,
+  row: Record<string, unknown>,
+): boolean {
+  if (expandable === undefined || expandable === false) return false;
+  if (expandable === true) return true;
+  return expandable(row);
+}
+
 export function VirtualGrid({
   columns,
   data,
@@ -277,6 +376,19 @@ export function VirtualGrid({
   onPageSizeChange,
   groupBy,
   spanMethod,
+  tree = false,
+  childrenField = "children",
+  expandedKeys: expandedKeysProp,
+  defaultExpandedKeys = [],
+  onExpandedKeysChange,
+  cascadeParent = false,
+  cascadeChild = false,
+  loadData,
+  expandable,
+  expandedRowKeys: expandedRowKeysProp,
+  defaultExpandedRowKeys = [],
+  onExpandedRowKeysChange,
+  renderExpandedRow,
   renderCell,
   renderHeader,
 }: VirtualGridProps) {
@@ -285,20 +397,45 @@ export function VirtualGrid({
   const [heightCache, setHeightCache] = useState<Array<number | undefined>>([]);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
+  const loadingKeysRef = useRef(new Set<string>());
+
+  const [treeData, setTreeData] = useState(data);
+  useEffect(() => {
+    if (tree) setTreeData(data);
+  }, [tree, data]);
 
   const [uncontrolledSelectedKeys, setUncontrolledSelectedKeys] =
     useState<string[]>(defaultSelectedKeys);
   const [uncontrolledPage, setUncontrolledPage] = useState(defaultPage);
   const [uncontrolledPageSize, setUncontrolledPageSize] =
     useState(defaultPageSize);
+  const [uncontrolledExpandedKeys, setUncontrolledExpandedKeys] =
+    useState<string[]>(defaultExpandedKeys);
+  const [uncontrolledExpandedRowKeys, setUncontrolledExpandedRowKeys] =
+    useState<string[]>(defaultExpandedRowKeys);
 
   const selectedKeys = selectedKeysProp ?? uncontrolledSelectedKeys;
   const page = pageProp ?? uncontrolledPage;
   const pageSize = pageSizeProp ?? uncontrolledPageSize;
+  const expandedKeys = expandedKeysProp ?? uncontrolledExpandedKeys;
+  const expandedRowKeys = expandedRowKeysProp ?? uncontrolledExpandedRowKeys;
+
+  const showExpandCol = expandable !== undefined && expandable !== false;
+  const useCascade = tree && (cascadeParent || cascadeChild);
 
   function commitSelectedKeys(next: string[]) {
     if (selectedKeysProp === undefined) setUncontrolledSelectedKeys(next);
     onSelectedKeysChange?.(next);
+  }
+
+  function commitExpandedKeys(next: string[]) {
+    if (expandedKeysProp === undefined) setUncontrolledExpandedKeys(next);
+    onExpandedKeysChange?.(next);
+  }
+
+  function commitExpandedRowKeys(next: string[]) {
+    if (expandedRowKeysProp === undefined) setUncontrolledExpandedRowKeys(next);
+    onExpandedRowKeysChange?.(next);
   }
 
   function setPage(next: number) {
@@ -325,12 +462,38 @@ export function VirtualGrid({
   const headerRows = useMemo(() => buildHeaderRows(columns), [columns]);
   const headerDepth = Math.max(1, headerRows.length);
 
-  const displayRows = useMemo(
-    () => buildGroupedRows(data, groupBy),
-    [data, groupBy],
+  const treeFlat = useMemo(
+    () =>
+      tree
+        ? flattenTree({
+            data: treeData,
+            idField,
+            childrenField,
+            expandedKeys,
+          })
+        : null,
+    [tree, treeData, idField, childrenField, expandedKeys],
   );
 
-  const pagedDisplayRows = useMemo(
+  const treeMetaByKey = useMemo(() => {
+    const map = new Map<string, TreeFlatRow>();
+    if (!treeFlat) return map;
+    for (const item of treeFlat) map.set(item.key, item);
+    return map;
+  }, [treeFlat]);
+
+  const displayRows = useMemo((): DisplayRow[] => {
+    if (tree && treeFlat) {
+      return treeFlat.map((item, dataIndex) => ({
+        kind: "data" as const,
+        row: item.row,
+        dataIndex,
+      }));
+    }
+    return buildGroupedRows(data, groupBy);
+  }, [tree, treeFlat, data, groupBy]);
+
+  const pagedBaseRows = useMemo(
     () =>
       pagination
         ? slicePage(displayRows, {
@@ -341,6 +504,37 @@ export function VirtualGrid({
         : displayRows,
     [displayRows, pagination, page, pageSize],
   );
+
+  const pagedDisplayRows = useMemo((): BodyDisplayRow[] => {
+    if (!showExpandCol) return pagedBaseRows;
+    const out: BodyDisplayRow[] = [];
+    for (const display of pagedBaseRows) {
+      out.push(display);
+      if (display.kind !== "data") continue;
+      const key =
+        display.row[idField] !== undefined && display.row[idField] !== null
+          ? String(display.row[idField])
+          : String(display.dataIndex);
+      if (
+        isRowExpandable(expandable, display.row) &&
+        expandedRowKeys.includes(key)
+      ) {
+        out.push({
+          kind: "detail",
+          row: display.row,
+          dataIndex: display.dataIndex,
+          key,
+        });
+      }
+    }
+    return out;
+  }, [
+    pagedBaseRows,
+    showExpandCol,
+    expandable,
+    expandedRowKeys,
+    idField,
+  ]);
 
   useEffect(() => {
     setHeightCache(new Array(pagedDisplayRows.length));
@@ -353,16 +547,19 @@ export function VirtualGrid({
 
   const allKeys = useMemo(
     () =>
-      pagedDisplayRows
+      pagedBaseRows
         .filter(
           (d): d is Extract<DisplayRow, { kind: "data" }> => d.kind === "data",
         )
         .map((d) => rowKey(d.row, d.dataIndex)),
-    [pagedDisplayRows, idField],
+    [pagedBaseRows, idField],
   );
 
   const canVirtualize =
-    virtual && typeof height === "number" && spanMethod === undefined;
+    virtual &&
+    typeof height === "number" &&
+    spanMethod === undefined &&
+    !showExpandCol;
   if (virtual && typeof height !== "number" && isNodeDevelopment()) {
     console.warn(
       "VirtualGrid: `virtual` requires a numeric `height` prop; falling back to non-virtual rendering.",
@@ -384,11 +581,12 @@ export function VirtualGrid({
   });
 
   const layout = useMemo(
-    () => buildLayout(leafColumns, selectable, showRowNumber),
-    [leafColumns, selectable, showRowNumber],
+    () => buildLayout(leafColumns, selectable, showRowNumber, showExpandCol),
+    [leafColumns, selectable, showRowNumber, showExpandCol],
   );
 
-  const prefixCount = (selectable ? 1 : 0) + (showRowNumber ? 1 : 0);
+  const prefixCount =
+    (selectable ? 1 : 0) + (showExpandCol ? 1 : 0) + (showRowNumber ? 1 : 0);
 
   const gridTemplateColumns = useMemo(
     () =>
@@ -409,12 +607,13 @@ export function VirtualGrid({
 
   const spanMatrix = useMemo(() => {
     if (!spanMethod) return null;
+    // spanMethod only applies to DisplayRow (no detail rows)
     return normalizeSpans({
-      displayRows: pagedDisplayRows,
+      displayRows: pagedBaseRows,
       columns: leafColumns,
       spanMethod,
     });
-  }, [spanMethod, pagedDisplayRows, leafColumns]);
+  }, [spanMethod, pagedBaseRows, leafColumns]);
 
   useLayoutEffect(() => {
     const el = headerRef.current;
@@ -475,16 +674,103 @@ export function VirtualGrid({
   const allSelected = isAllSelected(selectedKeys, allKeys);
   const partiallySelected = isIndeterminate(selectedKeys, allKeys);
 
+  function handleToggleSelect(key: string) {
+    if (useCascade) {
+      commitSelectedKeys(
+        cascadeToggleKey({
+          selectedKeys,
+          key,
+          data: treeData,
+          idField,
+          childrenField,
+          multiple,
+          cascadeChild,
+          cascadeParent,
+        }),
+      );
+      return;
+    }
+    commitSelectedKeys(toggleKey(selectedKeys, key, multiple));
+  }
+
+  async function handleTreeExpand(flat: TreeFlatRow) {
+    const nextKeys = toggleExpandKey(expandedKeys, flat.key);
+    const willExpand = !flat.expanded;
+    commitExpandedKeys(nextKeys);
+
+    if (!willExpand || !loadData) return;
+    const kids = flat.row[childrenField];
+    const hasKids = Array.isArray(kids) && kids.length > 0;
+    if (hasKids) return;
+    if (loadingKeysRef.current.has(flat.key)) return;
+    loadingKeysRef.current.add(flat.key);
+    try {
+      const loaded = await loadData(flat.row);
+      setTreeData((prev) =>
+        setChildrenAtKey(prev, flat.key, loaded, idField, childrenField),
+      );
+    } finally {
+      loadingKeysRef.current.delete(flat.key);
+    }
+  }
+
+  function handleRowExpandToggle(key: string) {
+    commitExpandedRowKeys(toggleExpandKey(expandedRowKeys, key));
+  }
+
   function renderDataCell(
     column: VirtualGridColumn,
     row: Record<string, unknown>,
     rowIndex: number,
+    treeMeta?: TreeFlatRow,
+    isFirstDataCol?: boolean,
   ): ReactNode {
     const value = row[column.field];
     const ctx: VirtualGridCellContext = { row, column, value, rowIndex };
-    if (column.render) return column.render(ctx);
-    if (renderCell) return renderCell(ctx);
-    return String(value ?? "");
+    let content: ReactNode;
+    if (column.render) content = column.render(ctx);
+    else if (renderCell) content = renderCell(ctx);
+    else content = String(value ?? "");
+
+    if (tree && isFirstDataCol) {
+      const depth = treeMeta?.depth ?? 0;
+      const hasChildren = treeMeta?.hasChildren ?? false;
+      const expanded = treeMeta?.expanded ?? false;
+      const label = rowLabel(row, treeMeta?.key ?? rowKey(row, rowIndex));
+      return (
+        <div
+          className="flex min-w-0 items-center gap-1"
+          style={{ paddingLeft: depth * TREE_INDENT }}
+        >
+          {hasChildren ? (
+            <button
+              type="button"
+              className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-slate-500 hover:bg-slate-100"
+              aria-label={expanded ? `折叠 ${label}` : `展开 ${label}`}
+              aria-expanded={expanded}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (treeMeta) void handleTreeExpand(treeMeta);
+              }}
+            >
+              <span
+                aria-hidden
+                className="inline-block text-[10px] leading-none"
+                style={{
+                  transform: expanded ? "rotate(90deg)" : "rotate(0deg)",
+                }}
+              >
+                ▶
+              </span>
+            </button>
+          ) : (
+            <span className="inline-block h-5 w-5 shrink-0" aria-hidden />
+          )}
+          <span className="min-w-0 truncate">{content}</span>
+        </div>
+      );
+    }
+    return content;
   }
 
   function renderHeaderCell(column: VirtualGridColumn): ReactNode {
@@ -529,11 +815,43 @@ export function VirtualGrid({
     );
   }
 
+  function renderDetailRow(
+    display: Extract<BodyDisplayRow, { kind: "detail" }>,
+    absoluteIndex: number,
+  ) {
+    return (
+      <div
+        key={`detail-${display.key}-${absoluteIndex}`}
+        role="row"
+        aria-rowindex={absoluteIndex + 2}
+        data-vg-row={absoluteIndex}
+        style={{
+          display: "grid",
+          gridTemplateColumns,
+          minHeight: rowHeight,
+        }}
+        className="bg-slate-50"
+      >
+        <div
+          role="cell"
+          className={`${cellClass(true)} bg-slate-50`}
+          style={{ gridColumn: "1 / -1" }}
+        >
+          {renderExpandedRow?.({
+            row: display.row,
+            rowIndex: display.dataIndex,
+          })}
+        </div>
+      </div>
+    );
+  }
+
   function renderDataRow(
     display: Extract<DisplayRow, { kind: "data" }>,
     absoluteIndex: number,
   ) {
     const key = rowKey(display.row, display.dataIndex);
+    const treeMeta = treeMetaByKey.get(key);
     const stripeBg = stripe && display.dataIndex % 2 === 1;
     const rowBg = stripeBg ? "rgb(248 250 252)" : "rgb(255 255 255)";
     const measured = heightCache[absoluteIndex];
@@ -544,6 +862,9 @@ export function VirtualGrid({
         ? { minHeight: rowHeight, height: measured }
         : { height: rowHeight }),
     };
+    const rowCanExpand = isRowExpandable(expandable, display.row);
+    const rowExpanded = expandedRowKeys.includes(key);
+    const firstDataField = leafColumns[0]?.field;
 
     return (
       <div
@@ -556,6 +877,15 @@ export function VirtualGrid({
       >
         {layout.map((item) => {
           if (item.kind === "selection") {
+            const indeterminate =
+              useCascade &&
+              isTreeIndeterminate(
+                selectedKeys,
+                key,
+                treeData,
+                idField,
+                childrenField,
+              );
             return (
               <div
                 key="__sel"
@@ -565,14 +895,49 @@ export function VirtualGrid({
               >
                 <Checkbox
                   checked={selectedKeys.includes(key)}
-                  onCheckedChange={() =>
-                    commitSelectedKeys(toggleKey(selectedKeys, key, multiple))
-                  }
+                  indeterminate={indeterminate}
+                  onCheckedChange={() => handleToggleSelect(key)}
                 >
                   <span className="sr-only">
                     选择第 {display.dataIndex + 1} 行
                   </span>
                 </Checkbox>
+              </div>
+            );
+          }
+          if (item.kind === "expand") {
+            return (
+              <div
+                key="__exp"
+                role="cell"
+                className={cellClass(autoHeight)}
+                style={stickyStyle(item, false, rowBg)}
+              >
+                {rowCanExpand ? (
+                  <button
+                    type="button"
+                    className="inline-flex h-5 w-5 items-center justify-center rounded text-slate-500 hover:bg-slate-100"
+                    aria-label={
+                      rowExpanded
+                        ? `折叠行 ${display.dataIndex + 1}`
+                        : `展开行 ${display.dataIndex + 1}`
+                    }
+                    aria-expanded={rowExpanded}
+                    onClick={() => handleRowExpandToggle(key)}
+                  >
+                    <span
+                      aria-hidden
+                      className="inline-block text-[10px] leading-none"
+                      style={{
+                        transform: rowExpanded
+                          ? "rotate(90deg)"
+                          : "rotate(0deg)",
+                      }}
+                    >
+                      ▶
+                    </span>
+                  </button>
+                ) : null}
               </div>
             );
           }
@@ -588,6 +953,7 @@ export function VirtualGrid({
               </div>
             );
           }
+          const isFirstDataCol = item.column.field === firstDataField;
           return (
             <div
               key={item.column.field}
@@ -595,7 +961,13 @@ export function VirtualGrid({
               className={cellClass(autoHeight)}
               style={stickyStyle(item, false, rowBg)}
             >
-              {renderDataCell(item.column, display.row, display.dataIndex)}
+              {renderDataCell(
+                item.column,
+                display.row,
+                display.dataIndex,
+                treeMeta,
+                isFirstDataCol,
+              )}
             </div>
           );
         })}
@@ -603,15 +975,18 @@ export function VirtualGrid({
     );
   }
 
-  function renderDisplayRow(display: DisplayRow, absoluteIndex: number) {
+  function renderDisplayRow(display: BodyDisplayRow, absoluteIndex: number) {
     if (display.kind === "group") {
       return renderGroupRow(display, absoluteIndex);
+    }
+    if (display.kind === "detail") {
+      return renderDetailRow(display, absoluteIndex);
     }
     return renderDataRow(display, absoluteIndex);
   }
 
   function renderSpannedBody() {
-    const rows = pagedDisplayRows;
+    const rows = pagedBaseRows;
     const spans = spanMatrix!;
     const cells: ReactNode[] = [];
 
@@ -641,13 +1016,24 @@ export function VirtualGrid({
       }
 
       const key = rowKey(display.row, display.dataIndex);
+      const treeMeta = treeMetaByKey.get(key);
       const stripeBg = stripe && display.dataIndex % 2 === 1;
       const rowBg = stripeBg ? "rgb(248 250 252)" : "rgb(255 255 255)";
       const rowCells: ReactNode[] = [];
+      const firstDataField = leafColumns[0]?.field;
 
       let colOffset = 1;
       if (selectable) {
         const selItem = layout.find((i) => i.kind === "selection")!;
+        const indeterminate =
+          useCascade &&
+          isTreeIndeterminate(
+            selectedKeys,
+            key,
+            treeData,
+            idField,
+            childrenField,
+          );
         rowCells.push(
           <div
             key={`sel-${r}`}
@@ -661,12 +1047,47 @@ export function VirtualGrid({
           >
             <Checkbox
               checked={selectedKeys.includes(key)}
-              onCheckedChange={() =>
-                commitSelectedKeys(toggleKey(selectedKeys, key, multiple))
-              }
+              indeterminate={indeterminate}
+              onCheckedChange={() => handleToggleSelect(key)}
             >
               <span className="sr-only">选择第 {display.dataIndex + 1} 行</span>
             </Checkbox>
+          </div>,
+        );
+        colOffset++;
+      }
+      if (showExpandCol) {
+        const expItem = layout.find((i) => i.kind === "expand")!;
+        const rowCanExpand = isRowExpandable(expandable, display.row);
+        const rowExpanded = expandedRowKeys.includes(key);
+        rowCells.push(
+          <div
+            key={`exp-${r}`}
+            role="cell"
+            className={cellClass(false)}
+            style={{
+              gridRow: r + 1,
+              gridColumn: colOffset,
+              ...stickyStyle(expItem, false, rowBg),
+            }}
+          >
+            {rowCanExpand ? (
+              <button
+                type="button"
+                className="inline-flex h-5 w-5 items-center justify-center rounded text-slate-500 hover:bg-slate-100"
+                aria-label={
+                  rowExpanded
+                    ? `折叠行 ${display.dataIndex + 1}`
+                    : `展开行 ${display.dataIndex + 1}`
+                }
+                aria-expanded={rowExpanded}
+                onClick={() => handleRowExpandToggle(key)}
+              >
+                <span aria-hidden className="inline-block text-[10px]">
+                  ▶
+                </span>
+              </button>
+            ) : null}
           </div>,
         );
         colOffset++;
@@ -710,7 +1131,13 @@ export function VirtualGrid({
               background: sticky?.background ?? rowBg,
             }}
           >
-            {renderDataCell(column, display.row, display.dataIndex)}
+            {renderDataCell(
+              column,
+              display.row,
+              display.dataIndex,
+              treeMeta,
+              column.field === firstDataField,
+            )}
           </div>,
         );
       }
@@ -751,7 +1178,10 @@ export function VirtualGrid({
           );
 
   const prefixItems = layout.filter(
-    (item) => item.kind === "selection" || item.kind === "rowNumber",
+    (item) =>
+      item.kind === "selection" ||
+      item.kind === "expand" ||
+      item.kind === "rowNumber",
   );
 
   return (
@@ -811,6 +1241,21 @@ export function VirtualGrid({
                     </Checkbox>
                   ) : null}
                 </div>
+              );
+            }
+            if (item.kind === "expand") {
+              return (
+                <div
+                  key="__exp"
+                  role="columnheader"
+                  className={cellClass(false)}
+                  style={{
+                    gridColumn: idx + 1,
+                    gridRow: `1 / span ${headerDepth}`,
+                    ...stickyStyle(item, true, headerBg),
+                  }}
+                  aria-label="展开"
+                />
               );
             }
             return (

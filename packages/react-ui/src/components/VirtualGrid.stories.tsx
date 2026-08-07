@@ -238,3 +238,97 @@ export const MergeCells: Story = {
     },
   },
 };
+
+const treeStoryData = [
+  {
+    id: "1",
+    name: "研发中心",
+    children: [
+      {
+        id: "1-1",
+        name: "前端组",
+        children: [
+          { id: "1-1-1", name: "React" },
+          { id: "1-1-2", name: "Vue" },
+        ],
+      },
+      { id: "1-2", name: "后端组" },
+    ],
+  },
+  {
+    id: "2",
+    name: "产品中心",
+    children: [{ id: "2-1", name: "设计" }],
+  },
+];
+
+export const Tree: Story = {
+  args: {
+    columns: [
+      { field: "name", title: "名称", width: 220 },
+      { field: "id", title: "标识", width: 100 },
+    ],
+    data: treeStoryData,
+    tree: true,
+    defaultExpandedKeys: ["1"],
+    height: 360,
+  },
+};
+
+export const TreeSelection: Story = {
+  args: {
+    columns: [
+      { field: "name", title: "名称", width: 220 },
+      { field: "id", title: "标识", width: 100 },
+    ],
+    data: treeStoryData,
+    tree: true,
+    selectable: true,
+    cascadeChild: true,
+    cascadeParent: true,
+    defaultExpandedKeys: ["1", "1-1"],
+    height: 360,
+  },
+};
+
+export const LoadAsync: Story = {
+  args: {
+    columns: [
+      { field: "name", title: "名称", width: 220 },
+      { field: "id", title: "标识", width: 100 },
+    ],
+    data: [
+      { id: "a", name: "异步节点 A", __hasChildren: true },
+      { id: "b", name: "异步节点 B", __hasChildren: true },
+    ],
+    tree: true,
+    height: 360,
+    loadData: async (row) => {
+      await new Promise((r) => setTimeout(r, 400));
+      const id = String(row.id);
+      return [
+        { id: `${id}-1`, name: `${row.name} / 子项 1` },
+        { id: `${id}-2`, name: `${row.name} / 子项 2` },
+      ];
+    },
+  },
+};
+
+export const ExpandRow: Story = {
+  args: {
+    columns: [
+      { field: "id", title: "标识", width: 80 },
+      { field: "name", title: "名称", width: 120 },
+      { field: "fullName", title: "全称" },
+    ],
+    data: makeRows(8),
+    expandable: true,
+    height: 400,
+    renderExpandedRow: ({ row }) => (
+      <div className="space-y-1 text-slate-600">
+        <div>详情：{String(row.fullName)}</div>
+        <div className="text-xs text-slate-400">id = {String(row.id)}</div>
+      </div>
+    ),
+  },
+};

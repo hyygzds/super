@@ -322,3 +322,92 @@ describe("VirtualGrid (React) pagination", () => {
     ).toBe(true);
   });
 });
+
+const treeData = [
+  {
+    id: "1",
+    name: "Parent",
+    children: [
+      { id: "1-1", name: "Child A" },
+      { id: "1-2", name: "Child B" },
+    ],
+  },
+  { id: "2", name: "Leaf" },
+];
+
+describe("VirtualGrid (React) P4 tree / expandable", () => {
+  it("expands a tree node to reveal children", async () => {
+    const user = userEvent.setup();
+    render(<VirtualGrid columns={columns} data={treeData} tree />);
+    expect(screen.getByText("Parent")).toBeInTheDocument();
+    expect(screen.queryByText("Child A")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "展开 Parent" }));
+
+    expect(screen.getByText("Child A")).toBeInTheDocument();
+    expect(screen.getByText("Child B")).toBeInTheDocument();
+  });
+
+  it("cascadeChild selects descendants when parent is checked", async () => {
+    const user = userEvent.setup();
+    const onSelectedKeysChange = vi.fn();
+    render(
+      <VirtualGrid
+        columns={columns}
+        data={treeData}
+        tree
+        selectable
+        cascadeChild
+        defaultExpandedKeys={["1"]}
+        onSelectedKeysChange={onSelectedKeysChange}
+      />,
+    );
+
+    const parentRow = screen.getByText("Parent").closest('[role="row"]')!;
+    await user.click(within(parentRow as HTMLElement).getByRole("checkbox"));
+
+    expect(onSelectedKeysChange).toHaveBeenCalledWith(
+      expect.arrayContaining(["1", "1-1", "1-2"]),
+    );
+  });
+
+  it("expandable shows detail row via renderExpandedRow", async () => {
+    const user = userEvent.setup();
+    render(
+      <VirtualGrid
+        columns={columns}
+        data={makeRows(2)}
+        expandable
+        renderExpandedRow={({ row }) => (
+          <div>Detail:{String(row.name)}</div>
+        )}
+      />,
+    );
+    expect(screen.queryByText("Detail:Row 1")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "展开行 1" }));
+
+    expect(screen.getByText("Detail:Row 1")).toBeInTheDocument();
+  });
+
+  it("loadData fills children when expanding a lazy node", async () => {
+    const user = userEvent.setup();
+    const loadData = vi.fn(async () => [
+      { id: "lazy-1", name: "Loaded Child" },
+    ]);
+    render(
+      <VirtualGrid
+        columns={columns}
+        data={[{ id: "root", name: "Lazy Root", __hasChildren: true }]}
+        tree
+        loadData={loadData}
+      />,
+    );
+    expect(screen.queryByText("Loaded Child")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "展开 Lazy Root" }));
+
+    expect(loadData).toHaveBeenCalled();
+    expect(await screen.findByText("Loaded Child")).toBeInTheDocument();
+  });
+});

@@ -34,6 +34,7 @@ export type {
   VirtualGridColumn,
   VirtualGridCellContext,
   VirtualGridHeaderContext,
+  VirtualGridExpandedRowContext,
   GroupByConfig,
   SpanMethod,
 } from "./components/VirtualGrid";

@@ -1,20 +1,25 @@
 import {
   buildGroupedRows,
   buildHeaderRows,
+  cascadeToggleKey,
   clearKeys,
   computeVirtualWindow,
   flattenLeafColumns,
+  flattenTree,
   isAllSelected,
   isIndeterminate,
+  isTreeIndeterminate,
   normalizeSpans,
   selectAllKeys,
   slicePage,
+  toggleExpandKey,
   toggleKey,
   type DisplayRow,
   type GridColumn,
   type GroupByConfig,
   type HeaderCell,
   type SpanMethod,
+  type TreeFlatRow,
 } from "@component-ai/grid-core";
 import {
   computed,
@@ -44,11 +49,18 @@ export type VirtualGridHeaderContext = {
   column: VirtualGridColumn;
 };
 
+export type VirtualGridExpandContext = {
+  row: Record<string, unknown>;
+  rowIndex: number;
+};
+
 export type { GroupByConfig, SpanMethod };
 
 const ROW_NUMBER_WIDTH = 48;
 const SELECTION_WIDTH = 40;
 const DEFAULT_COL_WIDTH = 120;
+const TREE_INDENT = 16;
+const TREE_TOGGLE_WIDTH = 20;
 
 type LayoutCol =
   | { kind: "selection"; width: number; stickyLeft: number }
@@ -60,6 +72,29 @@ type LayoutCol =
       stickyLeft?: number;
       stickyRight?: number;
     };
+
+type TreeMeta = {
+  depth: number;
+  hasChildren: boolean;
+  expanded: boolean;
+  key: string;
+};
+
+type DataBodyRow = Extract<DisplayRow, { kind: "data" }> & {
+  tree?: TreeMeta;
+};
+
+type DetailBodyRow = {
+  kind: "detail";
+  row: Record<string, unknown>;
+  dataIndex: number;
+  key: string;
+};
+
+type BodyRow =
+  | Extract<DisplayRow, { kind: "group" }>
+  | DataBodyRow
+  | DetailBodyRow;
 
 function isNodeDevelopment(): boolean {
   const proc = (
@@ -212,6 +247,77 @@ function placeHeaderCells(
   return placed;
 }
 
+function childrenOf(
+  row: Record<string, unknown>,
+  childrenField: string,
+): Record<string, unknown>[] {
+  const c = row[childrenField];
+  return Array.isArray(c) ? (c as Record<string, unknown>[]) : [];
+}
+
+function nodeKey(
+  row: Record<string, unknown>,
+  idField: string,
+  fallback: string,
+): string {
+  const v = row[idField];
+  return v !== undefined && v !== null ? String(v) : fallback;
+}
+
+/** Merge async loadData children into a copy of the tree for flatten/cascade. */
+function applyLoadedChildren(
+  rows: Record<string, unknown>[],
+  cache: Map<string, Record<string, unknown>[]>,
+  idField: string,
+  childrenField: string,
+  path = "r",
+): Record<string, unknown>[] {
+  return rows.map((row, index) => {
+    const key = nodeKey(row, idField, `${path}/${index}`);
+    const loaded = cache.get(key);
+    const existing = childrenOf(row, childrenField);
+    const kids = loaded ?? existing;
+    const nextKids = applyLoadedChildren(
+      kids,
+      cache,
+      idField,
+      childrenField,
+      `${path}/${index}`,
+    );
+    if (loaded !== undefined || nextKids !== kids) {
+      return { ...row, [childrenField]: nextKids };
+    }
+    return row;
+  });
+}
+
+function insertDetailRows(
+  rows: BodyRow[],
+  expandedRowKeys: readonly string[],
+  idField: string,
+  isRowExpandable: (row: Record<string, unknown>) => boolean,
+): BodyRow[] {
+  if (expandedRowKeys.length === 0 && !rows.some((r) => r.kind === "data")) {
+    return rows;
+  }
+  const expanded = new Set(expandedRowKeys);
+  const out: BodyRow[] = [];
+  for (const row of rows) {
+    out.push(row);
+    if (row.kind !== "data") continue;
+    const key = nodeKey(row.row, idField, String(row.dataIndex));
+    if (isRowExpandable(row.row) && expanded.has(key)) {
+      out.push({
+        kind: "detail",
+        row: row.row,
+        dataIndex: row.dataIndex,
+        key,
+      });
+    }
+  }
+  return out;
+}
+
 export const VirtualGrid = defineComponent({
   name: "VirtualGrid",
   props: {
@@ -262,11 +368,46 @@ export const VirtualGrid = defineComponent({
       type: Function as PropType<SpanMethod | undefined>,
       default: undefined,
     },
+    tree: { type: Boolean, default: false },
+    childrenField: { type: String, default: "children" },
+    expandedKeys: {
+      type: Array as PropType<string[] | undefined>,
+      default: undefined,
+    },
+    defaultExpandedKeys: {
+      type: Array as PropType<string[]>,
+      default: () => [],
+    },
+    cascadeParent: { type: Boolean, default: false },
+    cascadeChild: { type: Boolean, default: false },
+    loadData: {
+      type: Function as PropType<
+        | ((row: Record<string, unknown>) => Promise<Record<string, unknown>[]>)
+        | undefined
+      >,
+      default: undefined,
+    },
+    expandable: {
+      type: [Boolean, Function] as PropType<
+        boolean | ((row: Record<string, unknown>) => boolean)
+      >,
+      default: false,
+    },
+    expandedRowKeys: {
+      type: Array as PropType<string[] | undefined>,
+      default: undefined,
+    },
+    defaultExpandedRowKeys: {
+      type: Array as PropType<string[]>,
+      default: () => [],
+    },
   },
   emits: {
     "update:selectedKeys": (_keys: string[]) => true,
     "update:page": (_page: number) => true,
     "update:pageSize": (_pageSize: number) => true,
+    "update:expandedKeys": (_keys: string[]) => true,
+    "update:expandedRowKeys": (_keys: string[]) => true,
   },
   setup(props, { emit, slots }) {
     const scrollTop = ref(0);
@@ -279,6 +420,14 @@ export const VirtualGrid = defineComponent({
     const uncontrolledSelectedKeys = ref<string[]>(props.defaultSelectedKeys);
     const uncontrolledPage = ref(props.defaultPage);
     const uncontrolledPageSize = ref(props.defaultPageSize);
+    const uncontrolledExpandedKeys = ref<string[]>(props.defaultExpandedKeys);
+    const uncontrolledExpandedRowKeys = ref<string[]>(
+      props.defaultExpandedRowKeys,
+    );
+    const childrenCache = ref(
+      new Map<string, Record<string, unknown>[]>(),
+    );
+    const loadingKeys = ref(new Set<string>());
 
     const selectedKeys = computed(
       () => props.selectedKeys ?? uncontrolledSelectedKeys.value,
@@ -287,10 +436,28 @@ export const VirtualGrid = defineComponent({
     const pageSize = computed(
       () => props.pageSize ?? uncontrolledPageSize.value,
     );
+    const expandedKeys = computed(
+      () => props.expandedKeys ?? uncontrolledExpandedKeys.value,
+    );
+    const expandedRowKeys = computed(
+      () => props.expandedRowKeys ?? uncontrolledExpandedRowKeys.value,
+    );
 
     function commitSelectedKeys(next: string[]) {
       if (props.selectedKeys === undefined) uncontrolledSelectedKeys.value = next;
       emit("update:selectedKeys", next);
+    }
+
+    function commitExpandedKeys(next: string[]) {
+      if (props.expandedKeys === undefined) uncontrolledExpandedKeys.value = next;
+      emit("update:expandedKeys", next);
+    }
+
+    function commitExpandedRowKeys(next: string[]) {
+      if (props.expandedRowKeys === undefined) {
+        uncontrolledExpandedRowKeys.value = next;
+      }
+      emit("update:expandedRowKeys", next);
     }
 
     function setPage(next: number) {
@@ -305,6 +472,16 @@ export const VirtualGrid = defineComponent({
       emit("update:page", 1);
     }
 
+    function isRowExpandable(row: Record<string, unknown>): boolean {
+      const exp = props.expandable;
+      if (typeof exp === "function") return exp(row);
+      return !!exp;
+    }
+
+    function hasExpandableFeature(): boolean {
+      return props.expandable !== false;
+    }
+
     watch(page, () => {
       scrollTop.value = 0;
     });
@@ -315,19 +492,60 @@ export const VirtualGrid = defineComponent({
 
     const headerDepth = computed(() => Math.max(1, headerRows.value.length));
 
-    const displayRows = computed(() =>
-      buildGroupedRows(props.data, props.groupBy),
-    );
+    const treeData = computed(() => {
+      if (!props.tree) return props.data;
+      return applyLoadedChildren(
+        props.data,
+        childrenCache.value,
+        props.idField,
+        props.childrenField,
+      );
+    });
 
-    const pagedDisplayRows = computed(() =>
+    const baseDisplayRows = computed((): BodyRow[] => {
+      if (props.tree) {
+        const flat = flattenTree({
+          data: treeData.value,
+          idField: props.idField,
+          childrenField: props.childrenField,
+          expandedKeys: expandedKeys.value,
+        });
+        return flat.map(
+          (t: TreeFlatRow, dataIndex: number): DataBodyRow => ({
+            kind: "data",
+            row: t.row,
+            dataIndex,
+            tree: {
+              depth: t.depth,
+              hasChildren: t.hasChildren,
+              expanded: t.expanded,
+              key: t.key,
+            },
+          }),
+        );
+      }
+      return buildGroupedRows(props.data, props.groupBy);
+    });
+
+    const pagedBaseRows = computed(() =>
       props.pagination
-        ? slicePage(displayRows.value, {
+        ? slicePage(baseDisplayRows.value, {
             pageIndex: page.value,
             pageSize: pageSize.value,
-            total: displayRows.value.length,
+            total: baseDisplayRows.value.length,
           })
-        : displayRows.value,
+        : baseDisplayRows.value,
     );
+
+    const pagedDisplayRows = computed((): BodyRow[] => {
+      if (!hasExpandableFeature()) return pagedBaseRows.value;
+      return insertDetailRows(
+        pagedBaseRows.value,
+        expandedRowKeys.value,
+        props.idField,
+        isRowExpandable,
+      );
+    });
 
     watch(
       () =>
@@ -348,8 +566,8 @@ export const VirtualGrid = defineComponent({
 
     const allKeys = computed(() =>
       pagedDisplayRows.value
-        .filter((d): d is Extract<DisplayRow, { kind: "data" }> => d.kind === "data")
-        .map((d) => rowKey(d.row, d.dataIndex)),
+        .filter((d): d is DataBodyRow => d.kind === "data")
+        .map((d) => d.tree?.key ?? rowKey(d.row, d.dataIndex)),
     );
 
     const canVirtualize = computed(
@@ -411,8 +629,13 @@ export const VirtualGrid = defineComponent({
 
     const spanMatrix = computed(() => {
       if (!props.spanMethod) return null;
+      // spanMethod path ignores detail rows; use base paged data/group rows only
+      const rowsForSpan = pagedBaseRows.value.filter(
+        (r): r is Extract<BodyRow, { kind: "group" } | DataBodyRow> =>
+          r.kind === "group" || r.kind === "data",
+      );
       return normalizeSpans({
-        displayRows: pagedDisplayRows.value,
+        displayRows: rowsForSpan,
         columns: leafColumns.value,
         spanMethod: props.spanMethod,
       });
@@ -494,6 +717,66 @@ export const VirtualGrid = defineComponent({
       } ${props.bordered ? "border-b border-slate-200" : ""}`;
     }
 
+    function toggleLabel(row: Record<string, unknown>, key: string): string {
+      const name = row.name;
+      return name !== undefined && name !== null ? String(name) : key;
+    }
+
+    async function onToggleTreeExpand(meta: TreeMeta, row: Record<string, unknown>) {
+      const next = toggleExpandKey(expandedKeys.value, meta.key);
+      const willExpand = !meta.expanded;
+      commitExpandedKeys(next);
+
+      if (
+        willExpand &&
+        props.loadData &&
+        meta.hasChildren &&
+        childrenOf(row, props.childrenField).length === 0 &&
+        !childrenCache.value.has(meta.key) &&
+        !loadingKeys.value.has(meta.key)
+      ) {
+        const loading = new Set(loadingKeys.value);
+        loading.add(meta.key);
+        loadingKeys.value = loading;
+        try {
+          const loaded = await props.loadData(row);
+          const cache = new Map(childrenCache.value);
+          cache.set(meta.key, loaded);
+          childrenCache.value = cache;
+        } finally {
+          const done = new Set(loadingKeys.value);
+          done.delete(meta.key);
+          loadingKeys.value = done;
+        }
+      }
+    }
+
+    function onToggleRowExpand(key: string) {
+      commitExpandedRowKeys(toggleExpandKey(expandedRowKeys.value, key));
+    }
+
+    function onToggleSelect(key: string) {
+      if (
+        props.tree &&
+        (props.cascadeChild || props.cascadeParent)
+      ) {
+        commitSelectedKeys(
+          cascadeToggleKey({
+            selectedKeys: selectedKeys.value,
+            key,
+            data: treeData.value,
+            idField: props.idField,
+            childrenField: props.childrenField,
+            multiple: props.multiple,
+            cascadeChild: props.cascadeChild,
+            cascadeParent: props.cascadeParent,
+          }),
+        );
+        return;
+      }
+      commitSelectedKeys(toggleKey(selectedKeys.value, key, props.multiple));
+    }
+
     function renderDataCell(
       column: VirtualGridColumn,
       row: Record<string, unknown>,
@@ -521,7 +804,80 @@ export const VirtualGrid = defineComponent({
       );
     }
 
-    function renderGroupRow(display: Extract<DisplayRow, { kind: "group" }>, absoluteIndex: number) {
+    function renderRowLeading(
+      display: DataBodyRow,
+      isFirstDataCol: boolean,
+    ) {
+      if (!isFirstDataCol) return null;
+      const parts = [];
+
+      if (display.tree) {
+        const label = toggleLabel(display.row, display.tree.key);
+        const pad = display.tree.depth * TREE_INDENT;
+        if (display.tree.hasChildren) {
+          parts.push(
+            <button
+              type="button"
+              key="tree-toggle"
+              aria-label={
+                display.tree.expanded ? `折叠 ${label}` : `展开 ${label}`
+              }
+              class="mr-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-slate-500 hover:bg-slate-100"
+              style={{ marginLeft: `${pad}px` }}
+              onClick={(e: MouseEvent) => {
+                e.stopPropagation();
+                void onToggleTreeExpand(display.tree!, display.row);
+              }}
+            >
+              {display.tree.expanded ? "▼" : "▶"}
+            </button>,
+          );
+        } else {
+          parts.push(
+            <span
+              key="tree-spacer"
+              class="mr-1 inline-block shrink-0"
+              style={{
+                width: `${TREE_TOGGLE_WIDTH}px`,
+                marginLeft: `${pad}px`,
+              }}
+            />,
+          );
+        }
+      }
+
+      if (isRowExpandable(display.row)) {
+        const key = display.tree?.key ?? rowKey(display.row, display.dataIndex);
+        const open = expandedRowKeys.value.includes(key);
+        parts.push(
+          <button
+            type="button"
+            key="row-expand"
+            aria-label={
+              open
+                ? `折叠行 ${display.dataIndex + 1}`
+                : `展开行 ${display.dataIndex + 1}`
+            }
+            class="mr-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-slate-500 hover:bg-slate-100"
+            onClick={(e: MouseEvent) => {
+              e.stopPropagation();
+              onToggleRowExpand(key);
+            }}
+          >
+            {open ? "▼" : "▶"}
+          </button>,
+        );
+      }
+
+      return parts.length > 0 ? (
+        <span class="mr-1 inline-flex shrink-0 items-center">{parts}</span>
+      ) : null;
+    }
+
+    function renderGroupRow(
+      display: Extract<DisplayRow, { kind: "group" }>,
+      absoluteIndex: number,
+    ) {
       return (
         <div
           key={`group-${display.key}-${absoluteIndex}`}
@@ -545,11 +901,37 @@ export const VirtualGrid = defineComponent({
       );
     }
 
-    function renderDataRow(
-      display: Extract<DisplayRow, { kind: "data" }>,
-      absoluteIndex: number,
-    ) {
-      const key = rowKey(display.row, display.dataIndex);
+    function renderDetailRow(display: DetailBodyRow, absoluteIndex: number) {
+      const ctx: VirtualGridExpandContext = {
+        row: display.row,
+        rowIndex: display.dataIndex,
+      };
+      return (
+        <div
+          key={`detail-${display.key}-${absoluteIndex}`}
+          role="row"
+          aria-rowindex={absoluteIndex + 2}
+          data-vg-row={absoluteIndex}
+          style={{
+            display: "grid",
+            gridTemplateColumns: gridTemplateColumns.value,
+            minHeight: props.rowHeight,
+          }}
+          class="bg-slate-50"
+        >
+          <div
+            role="cell"
+            class={`${cellClass(true)} bg-slate-50`}
+            style={{ gridColumn: "1 / -1" }}
+          >
+            {slots.expand?.(ctx) ?? null}
+          </div>
+        </div>
+      );
+    }
+
+    function renderDataRow(display: DataBodyRow, absoluteIndex: number) {
+      const key = display.tree?.key ?? rowKey(display.row, display.dataIndex);
       const stripeBg = props.stripe && display.dataIndex % 2 === 1;
       const rowBg = stripeBg ? "rgb(248 250 252)" : "rgb(255 255 255)";
       const measured = heightCache.value[absoluteIndex];
@@ -560,6 +942,8 @@ export const VirtualGrid = defineComponent({
           ? { minHeight: props.rowHeight, height: measured }
           : { height: props.rowHeight }),
       };
+
+      let dataColIndex = 0;
 
       return (
         <div
@@ -572,6 +956,16 @@ export const VirtualGrid = defineComponent({
         >
           {layout.value.map((item) => {
             if (item.kind === "selection") {
+              const treeIndeterminate =
+                props.tree &&
+                props.cascadeParent &&
+                isTreeIndeterminate(
+                  selectedKeys.value,
+                  key,
+                  treeData.value,
+                  props.idField,
+                  props.childrenField,
+                );
               return (
                 <div
                   key="__sel"
@@ -581,11 +975,8 @@ export const VirtualGrid = defineComponent({
                 >
                   <Checkbox
                     modelValue={selectedKeys.value.includes(key)}
-                    onUpdate:modelValue={() =>
-                      commitSelectedKeys(
-                        toggleKey(selectedKeys.value, key, props.multiple),
-                      )
-                    }
+                    indeterminate={treeIndeterminate}
+                    onUpdate:modelValue={() => onToggleSelect(key)}
                   >
                     <span class="sr-only">选择第 {display.dataIndex + 1} 行</span>
                   </Checkbox>
@@ -604,6 +995,8 @@ export const VirtualGrid = defineComponent({
                 </div>
               );
             }
+            const isFirstDataCol = dataColIndex === 0;
+            dataColIndex++;
             return (
               <div
                 key={item.column.field}
@@ -611,6 +1004,7 @@ export const VirtualGrid = defineComponent({
                 class={cellClass(props.autoHeight)}
                 style={stickyStyle(item, false, rowBg)}
               >
+                {renderRowLeading(display, isFirstDataCol)}
                 {renderDataCell(item.column, display.row, display.dataIndex)}
               </div>
             );
@@ -619,15 +1013,21 @@ export const VirtualGrid = defineComponent({
       );
     }
 
-    function renderDisplayRow(display: DisplayRow, absoluteIndex: number) {
+    function renderDisplayRow(display: BodyRow, absoluteIndex: number) {
       if (display.kind === "group") {
         return renderGroupRow(display, absoluteIndex);
+      }
+      if (display.kind === "detail") {
+        return renderDetailRow(display, absoluteIndex);
       }
       return renderDataRow(display, absoluteIndex);
     }
 
     function renderSpannedBody() {
-      const rows = pagedDisplayRows.value;
+      const rows = pagedBaseRows.value.filter(
+        (r): r is Extract<BodyRow, { kind: "group" } | DataBodyRow> =>
+          r.kind === "group" || r.kind === "data",
+      );
       const spans = spanMatrix.value!;
       const cells = [];
 
@@ -656,7 +1056,7 @@ export const VirtualGrid = defineComponent({
           continue;
         }
 
-        const key = rowKey(display.row, display.dataIndex);
+        const key = display.tree?.key ?? rowKey(display.row, display.dataIndex);
         const stripeBg = props.stripe && display.dataIndex % 2 === 1;
         const rowBg = stripeBg ? "rgb(248 250 252)" : "rgb(255 255 255)";
         const rowCells = [];
@@ -664,6 +1064,16 @@ export const VirtualGrid = defineComponent({
         let colOffset = 1;
         if (props.selectable) {
           const selItem = layout.value.find((i) => i.kind === "selection")!;
+          const treeIndeterminate =
+            props.tree &&
+            props.cascadeParent &&
+            isTreeIndeterminate(
+              selectedKeys.value,
+              key,
+              treeData.value,
+              props.idField,
+              props.childrenField,
+            );
           rowCells.push(
             <div
               key={`sel-${r}`}
@@ -677,11 +1087,8 @@ export const VirtualGrid = defineComponent({
             >
               <Checkbox
                 modelValue={selectedKeys.value.includes(key)}
-                onUpdate:modelValue={() =>
-                  commitSelectedKeys(
-                    toggleKey(selectedKeys.value, key, props.multiple),
-                  )
-                }
+                indeterminate={treeIndeterminate}
+                onUpdate:modelValue={() => onToggleSelect(key)}
               >
                 <span class="sr-only">选择第 {display.dataIndex + 1} 行</span>
               </Checkbox>
@@ -728,6 +1135,7 @@ export const VirtualGrid = defineComponent({
                 background: sticky?.background ?? rowBg,
               }}
             >
+              {c === 0 ? renderRowLeading(display, true) : null}
               {renderDataCell(column, display.row, display.dataIndex)}
             </div>,
           );
@@ -923,7 +1331,7 @@ export const VirtualGrid = defineComponent({
               }`}
             >
               <Pagination
-                total={displayRows.value.length}
+                total={baseDisplayRows.value.length}
                 page={page.value}
                 pageSize={pageSize.value}
                 pageSizeOptions={props.pageSizeOptions}
