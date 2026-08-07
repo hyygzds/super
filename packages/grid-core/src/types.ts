@@ -55,3 +55,38 @@ export type PageSliceResult = {
   start: number;
   end: number;
 };
+
+export type HeaderCell = {
+  title: string;
+  colspan: number;
+  rowspan: number;
+  /** Present for leaf header cells */
+  column?: GridColumn;
+};
+
+export type GroupByConfig = string | string[];
+
+export type DisplayRow =
+  | {
+      kind: "group";
+      key: string;
+      label: string;
+      count: number;
+    }
+  | {
+      kind: "data";
+      row: Record<string, unknown>;
+      dataIndex: number;
+    };
+
+export type SpanResult = {
+  rowspan: number;
+  colspan: number;
+};
+
+export type SpanMethod = (ctx: {
+  row: Record<string, unknown>;
+  column: GridColumn;
+  rowIndex: number;
+  columnIndex: number;
+}) => { rowspan?: number; colspan?: number } | void | undefined;

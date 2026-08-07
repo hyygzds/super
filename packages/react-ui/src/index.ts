@@ -34,6 +34,8 @@ export type {
   VirtualGridColumn,
   VirtualGridCellContext,
   VirtualGridHeaderContext,
+  GroupByConfig,
+  SpanMethod,
 } from "./components/VirtualGrid";
 export { Form, FormItem } from "./components/Form";
 export type { FormProps, FormItemProps, FormHandle } from "./components/Form";

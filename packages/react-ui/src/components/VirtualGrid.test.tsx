@@ -210,6 +210,61 @@ describe("VirtualGrid (React) selection", () => {
   });
 });
 
+describe("VirtualGrid (React) P3 group / span", () => {
+  it("renders nested column parent title and leaf title", () => {
+    render(
+      <VirtualGrid
+        columns={[
+          {
+            field: "info",
+            title: "信息",
+            children: [
+              { field: "id", title: "标识", width: 80 },
+              { field: "name", title: "名称", width: 120 },
+            ],
+          },
+        ]}
+        data={makeRows(2)}
+      />,
+    );
+    expect(screen.getByText("信息")).toBeInTheDocument();
+    expect(screen.getByText("标识")).toBeInTheDocument();
+    expect(screen.getByText("Row 1")).toBeInTheDocument();
+  });
+
+  it("shows group label when groupBy is set", () => {
+    render(
+      <VirtualGrid
+        columns={columns}
+        data={[
+          { id: "1", name: "Row 1", dept: "研发" },
+          { id: "2", name: "Row 2", dept: "研发" },
+          { id: "3", name: "Row 3", dept: "设计" },
+        ]}
+        groupBy="dept"
+      />,
+    );
+    expect(screen.getByText("研发 (2)")).toBeInTheDocument();
+    expect(screen.getByText("设计 (1)")).toBeInTheDocument();
+  });
+
+  it("renders all rows (not windowed) when spanMethod and virtual are both set", () => {
+    render(
+      <VirtualGrid
+        columns={columns}
+        data={makeRows(40)}
+        virtual
+        height={100}
+        rowHeight={20}
+        overscan={1}
+        spanMethod={() => ({ rowspan: 1, colspan: 1 })}
+      />,
+    );
+    expect(screen.getAllByRole("row")).toHaveLength(1 + 40);
+    expect(screen.getByText("Row 40")).toBeInTheDocument();
+  });
+});
+
 describe("VirtualGrid (React) pagination", () => {
   it("renders only pageSize rows per page and shows the full total in Pagination", () => {
     render(

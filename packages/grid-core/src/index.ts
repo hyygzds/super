@@ -4,6 +4,11 @@ export type {
   VirtualWindowResult,
   PageSliceInput,
   PageSliceResult,
+  HeaderCell,
+  GroupByConfig,
+  DisplayRow,
+  SpanResult,
+  SpanMethod,
 } from "./types";
 export { SelectionMode } from "./types";
 export { computeVirtualWindow } from "./virtual-window";
@@ -15,3 +20,6 @@ export {
   isAllSelected,
   isIndeterminate,
 } from "./selection";
+export { flattenLeafColumns, buildHeaderRows } from "./columns";
+export { buildGroupedRows } from "./group";
+export { normalizeSpans } from "./span";

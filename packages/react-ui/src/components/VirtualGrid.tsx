@@ -1,12 +1,20 @@
 import {
+  buildGroupedRows,
+  buildHeaderRows,
   clearKeys,
   computeVirtualWindow,
+  flattenLeafColumns,
   isAllSelected,
   isIndeterminate,
+  normalizeSpans,
   selectAllKeys,
   slicePage,
   toggleKey,
+  type DisplayRow,
   type GridColumn,
+  type GroupByConfig,
+  type HeaderCell,
+  type SpanMethod,
 } from "@component-ai/grid-core";
 import {
   useEffect,
@@ -34,7 +42,10 @@ export type VirtualGridHeaderContext = {
 export type VirtualGridColumn = GridColumn & {
   render?: (ctx: VirtualGridCellContext) => ReactNode;
   renderHeader?: (ctx: VirtualGridHeaderContext) => ReactNode;
+  children?: VirtualGridColumn[];
 };
+
+export type { GroupByConfig, SpanMethod };
 
 export type VirtualGridProps = {
   columns: VirtualGridColumn[];
@@ -64,6 +75,8 @@ export type VirtualGridProps = {
   pageSizeOptions?: number[];
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
+  groupBy?: GroupByConfig;
+  spanMethod?: SpanMethod;
   renderCell?: (ctx: VirtualGridCellContext) => ReactNode;
   renderHeader?: (ctx: VirtualGridHeaderContext) => ReactNode;
 };
@@ -118,18 +131,33 @@ function buildLayout(
     left += ROW_NUMBER_WIDTH;
   }
 
+  // Preserve leaf DFS order so header colspan aligns with body columns.
+  // Sticky offsets accumulate only across leading sticky (sel / row# / fixed-left) cols.
+  const rightOffset = new Map<string, number>();
+  let right = 0;
+  for (let i = visibleColumns.length - 1; i >= 0; i--) {
+    const column = visibleColumns[i]!;
+    if (column.fixed === "right") {
+      rightOffset.set(column.field, right);
+      right += colWidth(column, true)!;
+    }
+  }
+
   for (const column of visibleColumns) {
     if (column.fixed === "left") {
       const width = colWidth(column, true)!;
       layout.push({ kind: "data", column, width, stickyLeft: left });
       left += width;
-    }
-  }
-
-  for (const column of visibleColumns) {
-    if (!column.fixed) {
+    } else if (column.fixed === "right") {
+      const width = colWidth(column, true)!;
+      layout.push({
+        kind: "data",
+        column,
+        width,
+        stickyRight: rightOffset.get(column.field) ?? 0,
+      });
+    } else {
       const width = colWidth(column, hasFixed);
-      // width 0 → 1fr in template (only when no fixed columns)
       layout.push({
         kind: "data",
         column,
@@ -137,22 +165,6 @@ function buildLayout(
       });
     }
   }
-
-  const rightCols = visibleColumns.filter((c) => c.fixed === "right");
-  let right = 0;
-  const rightLayout: LayoutCol[] = [];
-  for (let i = rightCols.length - 1; i >= 0; i--) {
-    const column = rightCols[i]!;
-    const width = colWidth(column, true)!;
-    rightLayout.unshift({
-      kind: "data",
-      column,
-      width,
-      stickyRight: right,
-    });
-    right += width;
-  }
-  layout.push(...rightLayout);
   return layout;
 }
 
@@ -190,6 +202,51 @@ function stickyStyle(
   return isHeader ? { background: bg } : undefined;
 }
 
+/** Place header cells into a CSS grid, accounting for rowspan occupancy. */
+function placeHeaderCells(
+  headerRows: HeaderCell[][],
+  prefixCount: number,
+): Array<{
+  cell: HeaderCell;
+  gridColumn: string;
+  gridRow: string;
+  key: string;
+}> {
+  const depth = headerRows.length;
+  if (depth === 0) return [];
+  const cols = headerRows[0]!.reduce((sum, c) => sum + c.colspan, 0);
+  const occupied: boolean[][] = Array.from({ length: depth }, () =>
+    Array.from({ length: cols }, () => false),
+  );
+  const placed: Array<{
+    cell: HeaderCell;
+    gridColumn: string;
+    gridRow: string;
+    key: string;
+  }> = [];
+
+  for (let r = 0; r < depth; r++) {
+    let cursor = 0;
+    for (const cell of headerRows[r]!) {
+      while (cursor < cols && occupied[r]![cursor]) cursor++;
+      const start = cursor;
+      for (let rr = r; rr < r + cell.rowspan; rr++) {
+        for (let cc = start; cc < start + cell.colspan; cc++) {
+          if (rr < depth && cc < cols) occupied[rr]![cc] = true;
+        }
+      }
+      placed.push({
+        cell,
+        gridColumn: `${prefixCount + start + 1} / span ${cell.colspan}`,
+        gridRow: `${r + 1} / span ${cell.rowspan}`,
+        key: `${r}-${start}-${cell.title}-${cell.column?.field ?? ""}`,
+      });
+      cursor = start + cell.colspan;
+    }
+  }
+  return placed;
+}
+
 export function VirtualGrid({
   columns,
   data,
@@ -218,6 +275,8 @@ export function VirtualGrid({
   pageSizeOptions,
   onPageChange,
   onPageSizeChange,
+  groupBy,
+  spanMethod,
   renderCell,
   renderHeader,
 }: VirtualGridProps) {
@@ -258,22 +317,34 @@ export function VirtualGrid({
     setScrollTop(0);
   }, [page]);
 
-  const visibleColumns = useMemo(
-    () => columns.filter((c) => !c.hidden),
+  const leafColumns = useMemo(
+    () => flattenLeafColumns(columns) as VirtualGridColumn[],
     [columns],
   );
 
-  const pagedRows = useMemo(
+  const headerRows = useMemo(() => buildHeaderRows(columns), [columns]);
+  const headerDepth = Math.max(1, headerRows.length);
+
+  const displayRows = useMemo(
+    () => buildGroupedRows(data, groupBy),
+    [data, groupBy],
+  );
+
+  const pagedDisplayRows = useMemo(
     () =>
       pagination
-        ? slicePage(data, { pageIndex: page, pageSize, total: data.length })
-        : data,
-    [data, pagination, page, pageSize],
+        ? slicePage(displayRows, {
+            pageIndex: page,
+            pageSize,
+            total: displayRows.length,
+          })
+        : displayRows,
+    [displayRows, pagination, page, pageSize],
   );
 
   useEffect(() => {
-    setHeightCache(new Array(pagedRows.length));
-  }, [pagedRows.length, page, pageSize]);
+    setHeightCache(new Array(pagedDisplayRows.length));
+  }, [pagedDisplayRows.length, page, pageSize]);
 
   function rowKey(row: Record<string, unknown>, absoluteIndex: number): string {
     const v = row[idField];
@@ -281,11 +352,17 @@ export function VirtualGrid({
   }
 
   const allKeys = useMemo(
-    () => pagedRows.map((row, i) => rowKey(row, i)),
-    [pagedRows, idField],
+    () =>
+      pagedDisplayRows
+        .filter(
+          (d): d is Extract<DisplayRow, { kind: "data" }> => d.kind === "data",
+        )
+        .map((d) => rowKey(d.row, d.dataIndex)),
+    [pagedDisplayRows, idField],
   );
 
-  const canVirtualize = virtual && typeof height === "number";
+  const canVirtualize =
+    virtual && typeof height === "number" && spanMethod === undefined;
   if (virtual && typeof height !== "number" && isNodeDevelopment()) {
     console.warn(
       "VirtualGrid: `virtual` requires a numeric `height` prop; falling back to non-virtual rendering.",
@@ -296,7 +373,7 @@ export function VirtualGrid({
 
   const win = computeVirtualWindow({
     enabled: canVirtualize,
-    rowCount: pagedRows.length,
+    rowCount: pagedDisplayRows.length,
     rowHeight,
     rowHeights: autoHeight ? heightCache : undefined,
     scrollTop: rowScrollTop,
@@ -307,9 +384,11 @@ export function VirtualGrid({
   });
 
   const layout = useMemo(
-    () => buildLayout(visibleColumns, selectable, showRowNumber),
-    [visibleColumns, selectable, showRowNumber],
+    () => buildLayout(leafColumns, selectable, showRowNumber),
+    [leafColumns, selectable, showRowNumber],
   );
+
+  const prefixCount = (selectable ? 1 : 0) + (showRowNumber ? 1 : 0);
 
   const gridTemplateColumns = useMemo(
     () =>
@@ -323,6 +402,20 @@ export function VirtualGrid({
     [layout],
   );
 
+  const placedHeaderCells = useMemo(
+    () => placeHeaderCells(headerRows, prefixCount),
+    [headerRows, prefixCount],
+  );
+
+  const spanMatrix = useMemo(() => {
+    if (!spanMethod) return null;
+    return normalizeSpans({
+      displayRows: pagedDisplayRows,
+      columns: leafColumns,
+      spanMethod,
+    });
+  }, [spanMethod, pagedDisplayRows, leafColumns]);
+
   useLayoutEffect(() => {
     const el = headerRef.current;
     if (!el) return;
@@ -331,7 +424,7 @@ export function VirtualGrid({
   });
 
   useLayoutEffect(() => {
-    if (!autoHeight) return;
+    if (!autoHeight || spanMethod) return;
     const root = scrollerRef.current;
     if (!root) return;
     const nodes = root.querySelectorAll<HTMLElement>("[data-vg-row]");
@@ -346,7 +439,7 @@ export function VirtualGrid({
           const cur = prev[index];
           if (cur !== undefined && Math.abs(cur - h) < 1) return prev;
           const next = prev.slice();
-          while (next.length < pagedRows.length) next.push(undefined);
+          while (next.length < pagedDisplayRows.length) next.push(undefined);
           next[index] = h;
           return next;
         });
@@ -361,7 +454,8 @@ export function VirtualGrid({
     return () => observers.forEach((o) => o.disconnect());
   }, [
     autoHeight,
-    pagedRows.length,
+    spanMethod,
+    pagedDisplayRows.length,
     win.startIndex,
     win.endIndex,
     canVirtualize,
@@ -400,9 +494,47 @@ export function VirtualGrid({
     return column.title;
   }
 
-  function renderRow(row: Record<string, unknown>, absoluteIndex: number) {
-    const key = rowKey(row, absoluteIndex);
-    const stripeBg = stripe && absoluteIndex % 2 === 1;
+  function layoutItemForColumn(
+    column: VirtualGridColumn,
+  ): LayoutCol | undefined {
+    return layout.find(
+      (item) => item.kind === "data" && item.column.field === column.field,
+    );
+  }
+
+  function renderGroupRow(
+    display: Extract<DisplayRow, { kind: "group" }>,
+    absoluteIndex: number,
+  ) {
+    return (
+      <div
+        key={`group-${display.key}-${absoluteIndex}`}
+        role="row"
+        aria-rowindex={absoluteIndex + 2}
+        style={{
+          display: "grid",
+          gridTemplateColumns,
+          height: rowHeight,
+        }}
+        className="bg-slate-100 font-medium"
+      >
+        <div
+          role="cell"
+          className={`${cellClass(false)} bg-slate-100 font-medium`}
+          style={{ gridColumn: "1 / -1" }}
+        >
+          {`${display.label} (${display.count})`}
+        </div>
+      </div>
+    );
+  }
+
+  function renderDataRow(
+    display: Extract<DisplayRow, { kind: "data" }>,
+    absoluteIndex: number,
+  ) {
+    const key = rowKey(display.row, display.dataIndex);
+    const stripeBg = stripe && display.dataIndex % 2 === 1;
     const rowBg = stripeBg ? "rgb(248 250 252)" : "rgb(255 255 255)";
     const measured = heightCache[absoluteIndex];
     const rowStyle: CSSProperties = {
@@ -437,7 +569,9 @@ export function VirtualGrid({
                     commitSelectedKeys(toggleKey(selectedKeys, key, multiple))
                   }
                 >
-                  <span className="sr-only">选择第 {absoluteIndex + 1} 行</span>
+                  <span className="sr-only">
+                    选择第 {display.dataIndex + 1} 行
+                  </span>
                 </Checkbox>
               </div>
             );
@@ -450,7 +584,7 @@ export function VirtualGrid({
                 className={cellClass(autoHeight)}
                 style={stickyStyle(item, false, rowBg)}
               >
-                {absoluteIndex + 1}
+                {display.dataIndex + 1}
               </div>
             );
           }
@@ -461,10 +595,142 @@ export function VirtualGrid({
               className={cellClass(autoHeight)}
               style={stickyStyle(item, false, rowBg)}
             >
-              {renderDataCell(item.column, row, absoluteIndex)}
+              {renderDataCell(item.column, display.row, display.dataIndex)}
             </div>
           );
         })}
+      </div>
+    );
+  }
+
+  function renderDisplayRow(display: DisplayRow, absoluteIndex: number) {
+    if (display.kind === "group") {
+      return renderGroupRow(display, absoluteIndex);
+    }
+    return renderDataRow(display, absoluteIndex);
+  }
+
+  function renderSpannedBody() {
+    const rows = pagedDisplayRows;
+    const spans = spanMatrix!;
+    const cells: ReactNode[] = [];
+
+    for (let r = 0; r < rows.length; r++) {
+      const display = rows[r]!;
+      if (display.kind === "group") {
+        cells.push(
+          <div
+            key={`group-${display.key}-${r}`}
+            role="row"
+            aria-rowindex={r + 2}
+            className="contents"
+          >
+            <div
+              role="cell"
+              className={`${cellClass(false)} bg-slate-100 font-medium`}
+              style={{
+                gridRow: r + 1,
+                gridColumn: "1 / -1",
+              }}
+            >
+              {`${display.label} (${display.count})`}
+            </div>
+          </div>,
+        );
+        continue;
+      }
+
+      const key = rowKey(display.row, display.dataIndex);
+      const stripeBg = stripe && display.dataIndex % 2 === 1;
+      const rowBg = stripeBg ? "rgb(248 250 252)" : "rgb(255 255 255)";
+      const rowCells: ReactNode[] = [];
+
+      let colOffset = 1;
+      if (selectable) {
+        const selItem = layout.find((i) => i.kind === "selection")!;
+        rowCells.push(
+          <div
+            key={`sel-${r}`}
+            role="cell"
+            className={cellClass(false)}
+            style={{
+              gridRow: r + 1,
+              gridColumn: colOffset,
+              ...stickyStyle(selItem, false, rowBg),
+            }}
+          >
+            <Checkbox
+              checked={selectedKeys.includes(key)}
+              onCheckedChange={() =>
+                commitSelectedKeys(toggleKey(selectedKeys, key, multiple))
+              }
+            >
+              <span className="sr-only">选择第 {display.dataIndex + 1} 行</span>
+            </Checkbox>
+          </div>,
+        );
+        colOffset++;
+      }
+      if (showRowNumber) {
+        const numItem = layout.find((i) => i.kind === "rowNumber")!;
+        rowCells.push(
+          <div
+            key={`num-${r}`}
+            role="cell"
+            className={cellClass(false)}
+            style={{
+              gridRow: r + 1,
+              gridColumn: colOffset,
+              ...stickyStyle(numItem, false, rowBg),
+            }}
+          >
+            {display.dataIndex + 1}
+          </div>,
+        );
+        colOffset++;
+      }
+
+      for (let c = 0; c < leafColumns.length; c++) {
+        const span = spans[r]![c]!;
+        if (span.rowspan === 0 || span.colspan === 0) continue;
+        const column = leafColumns[c]!;
+        const layoutItem = layoutItemForColumn(column);
+        const sticky = layoutItem
+          ? stickyStyle(layoutItem, false, rowBg)
+          : undefined;
+        rowCells.push(
+          <div
+            key={`${r}-${column.field}`}
+            role="cell"
+            className={`${cellClass(false)} ${stripeBg ? "bg-slate-50" : "bg-white"}`}
+            style={{
+              gridRow: `${r + 1} / span ${span.rowspan}`,
+              gridColumn: `${prefixCount + c + 1} / span ${span.colspan}`,
+              ...sticky,
+              background: sticky?.background ?? rowBg,
+            }}
+          >
+            {renderDataCell(column, display.row, display.dataIndex)}
+          </div>,
+        );
+      }
+
+      cells.push(
+        <div key={key} role="row" aria-rowindex={r + 2} className="contents">
+          {rowCells}
+        </div>,
+      );
+    }
+
+    return (
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns,
+          gridTemplateRows: `repeat(${rows.length}, ${rowHeight}px)`,
+        }}
+      >
+        {cells}
       </div>
     );
   }
@@ -473,14 +739,27 @@ export function VirtualGrid({
   const scrollerStyle: CSSProperties | undefined =
     height !== undefined ? { height: toCssHeight(height) } : undefined;
 
-  const bodyRows = canVirtualize
-    ? pagedRows
-        .slice(win.startIndex, win.endIndex)
-        .map((row, i) => renderRow(row, win.startIndex + i))
-    : pagedRows.map((row, absoluteIndex) => renderRow(row, absoluteIndex));
+  const bodyRows =
+    spanMethod !== undefined
+      ? null
+      : canVirtualize
+        ? pagedDisplayRows
+            .slice(win.startIndex, win.endIndex)
+            .map((row, i) => renderDisplayRow(row, win.startIndex + i))
+        : pagedDisplayRows.map((row, absoluteIndex) =>
+            renderDisplayRow(row, absoluteIndex),
+          );
+
+  const prefixItems = layout.filter(
+    (item) => item.kind === "selection" || item.kind === "rowNumber",
+  );
 
   return (
-    <div className={rootCls} role="table" aria-rowcount={pagedRows.length + 1}>
+    <div
+      className={rootCls}
+      role="table"
+      aria-rowcount={pagedDisplayRows.length + 1}
+    >
       <div
         ref={scrollerRef}
         data-vg-scroller=""
@@ -498,20 +777,25 @@ export function VirtualGrid({
           style={{
             display: "grid",
             gridTemplateColumns,
+            gridTemplateRows: `repeat(${headerDepth}, ${rowHeight}px)`,
             position: "sticky",
             top: 0,
             zIndex: 5,
           }}
           className="bg-slate-50 font-medium"
         >
-          {layout.map((item) => {
+          {prefixItems.map((item, idx) => {
             if (item.kind === "selection") {
               return (
                 <div
                   key="__sel"
                   role="columnheader"
                   className={cellClass(false)}
-                  style={stickyStyle(item, true, headerBg)}
+                  style={{
+                    gridColumn: idx + 1,
+                    gridRow: `1 / span ${headerDepth}`,
+                    ...stickyStyle(item, true, headerBg),
+                  }}
                 >
                   {multiple && showSelectAll ? (
                     <Checkbox
@@ -529,34 +813,52 @@ export function VirtualGrid({
                 </div>
               );
             }
-            if (item.kind === "rowNumber") {
-              return (
-                <div
-                  key="__num"
-                  role="columnheader"
-                  className={cellClass(false)}
-                  style={stickyStyle(item, true, headerBg)}
-                  aria-label="序号"
-                >
-                  #
-                </div>
-              );
-            }
             return (
               <div
-                key={item.column.field}
+                key="__num"
                 role="columnheader"
                 className={cellClass(false)}
-                style={stickyStyle(item, true, headerBg)}
+                style={{
+                  gridColumn: idx + 1,
+                  gridRow: `1 / span ${headerDepth}`,
+                  ...stickyStyle(item, true, headerBg),
+                }}
+                aria-label="序号"
               >
-                {renderHeaderCell(item.column)}
+                #
+              </div>
+            );
+          })}
+          {placedHeaderCells.map(({ cell, gridColumn, gridRow, key }) => {
+            const layoutItem = cell.column
+              ? layoutItemForColumn(cell.column as VirtualGridColumn)
+              : undefined;
+            const sticky = layoutItem
+              ? stickyStyle(layoutItem, true, headerBg)
+              : { background: headerBg };
+            return (
+              <div
+                key={key}
+                role="columnheader"
+                className={cellClass(false)}
+                style={{
+                  gridColumn,
+                  gridRow,
+                  ...sticky,
+                }}
+              >
+                {cell.column
+                  ? renderHeaderCell(cell.column as VirtualGridColumn)
+                  : cell.title}
               </div>
             );
           })}
         </div>
 
-        {pagedRows.length === 0 ? (
+        {pagedDisplayRows.length === 0 ? (
           <div className="px-3 py-6 text-center text-slate-400">{emptyText}</div>
+        ) : spanMethod !== undefined ? (
+          renderSpannedBody()
         ) : canVirtualize ? (
           <div style={{ height: win.totalHeight, position: "relative" }}>
             <div style={{ transform: `translateY(${win.offsetY}px)` }}>
@@ -574,7 +876,7 @@ export function VirtualGrid({
           }`}
         >
           <Pagination
-            total={data.length}
+            total={displayRows.length}
             page={page}
             pageSize={pageSize}
             pageSizeOptions={pageSizeOptions}

@@ -190,3 +190,87 @@ export const FixedColumns: Story = {
     />
   ),
 };
+
+const headGroupColumns: VirtualGridColumn[] = [
+  {
+    field: "info",
+    title: "信息",
+    children: [
+      { field: "id", title: "标识", width: 80 },
+      { field: "code", title: "编号", width: 100 },
+      { field: "name", title: "名称", width: 120 },
+    ],
+  },
+  { field: "fullName", title: "全称", width: 160 },
+  { field: "status", title: "状态", width: 90 },
+];
+
+export const HeadGroup: Story = {
+  render: () => (
+    <VirtualGrid
+      columns={headGroupColumns}
+      data={Array.from({ length: 12 }, (_, i) => ({
+        id: String(i + 1),
+        code: String(i + 1).padStart(4, "0"),
+        name: `Name ${i + 1}`,
+        fullName: `Full Name ${i + 1}`,
+        status: i % 2 === 0 ? "启用" : "停用",
+      }))}
+      height={320}
+    />
+  ),
+};
+
+export const GroupData: Story = {
+  render: () => (
+    <VirtualGrid
+      columns={[
+        { field: "id", title: "标识", width: 80 },
+        { field: "dept", title: "部门", width: 100 },
+        { field: "name", title: "名称", width: 120 },
+        { field: "fullName", title: "全称" },
+      ]}
+      data={Array.from({ length: 20 }, (_, i) => ({
+        id: String(i + 1),
+        dept: ["研发", "设计", "产品"][i % 3],
+        name: `Name ${i + 1}`,
+        fullName: `Full Name ${i + 1}`,
+      }))}
+      groupBy="dept"
+      height={360}
+      selectable
+    />
+  ),
+};
+
+export const MergeCells: Story = {
+  render: () => {
+    const data = Array.from({ length: 12 }, (_, i) => ({
+      id: String(i + 1),
+      dept: i < 4 ? "研发" : i < 8 ? "设计" : "产品",
+      name: `Name ${i + 1}`,
+      note: `Note ${i + 1}`,
+    }));
+    return (
+      <VirtualGrid
+        columns={[
+          { field: "dept", title: "部门", width: 120 },
+          { field: "name", title: "名称", width: 140 },
+          { field: "note", title: "备注" },
+        ]}
+        data={data}
+        height={360}
+        virtual
+        spanMethod={({ row, column, rowIndex }) => {
+          if (column.field !== "dept") return;
+          let rowspan = 1;
+          for (let i = rowIndex + 1; i < data.length; i++) {
+            if (data[i]!.dept !== row.dept) break;
+            rowspan++;
+          }
+          return { rowspan, colspan: 1 };
+        }}
+      />
+    );
+  },
+};
