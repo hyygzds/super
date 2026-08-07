@@ -47,7 +47,7 @@
 3. 完成 [`2026-07-12-checkbox.md`](./2026-07-12-checkbox.md)（已完成，代码待 commit）
 4. 完成 [`2026-07-12-virtual-grid-p0.md`](./2026-07-12-virtual-grid-p0.md)（已完成，代码待 commit）
 5. 完成 [`2026-07-12-virtual-grid-p1.md`](./2026-07-12-virtual-grid-p1.md)（已完成，代码待 commit）
-6. Input 已纳入 Form 体系 roadmap（[`2026-07-13-form-roadmap.md`](./2026-07-13-form-roadmap.md)）；VirtualGrid 下一能力批次可用 brainstorming / writing-plans 写 P2（模板、自动行高、固定列）或继续 Form P0
+6. Input 已由 Form P1 交付（[`2026-08-07-input-controls.md`](./2026-08-07-input-controls.md)）；VirtualGrid 下一能力批次可用 brainstorming / writing-plans 写 P2（模板、自动行高、固定列）或继续 Form P2
 
 ---
 

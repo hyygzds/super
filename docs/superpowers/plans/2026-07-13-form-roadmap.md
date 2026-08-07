@@ -19,7 +19,7 @@
 | 顺序 | 计划文件 | 交付物 | 阻塞关系 |
 |------|----------|--------|----------|
 | 1 | [`2026-07-13-form-core-and-form.md`](./2026-07-13-form-core-and-form.md) | `@component-ai/form-core` + 双端 `Form` / `FormItem`（P0） | 无 |
-| 2 | *待写* `YYYY-MM-DD-input-controls.md` | 双端 `Input` / `InputNumber` / `Textarea`（P1） | 建议在 Form 接线 Story 前；可与 1 部分并行，但完整 Form demo 依赖本项 |
+| 2 | [`2026-08-07-input-controls.md`](./2026-08-07-input-controls.md) | 双端 `Input` / `InputNumber` / `Textarea`（P1） | 建议在 Form 接线 Story 前；可与 1 部分并行，但完整 Form demo 依赖本项 |
 | 3 | *待写* `YYYY-MM-DD-choice-controls.md` | 双端 `Radio`/`RadioGroup` / `Switch` + Checkbox/Select 接入 Story（P2） | 依赖 1；控件本身可不依赖 Form，接入 Story 依赖 1 |
 
 **规则（来自 spec §5）：** 原子控件必须先作为完整库组件合入；Form 只消费公开 API。P0 可用原生 input 验证接线，P1 起 Story 改用库组件。
@@ -35,11 +35,11 @@
 
 ## 当前应执行
 
-**P0 已完成**（[`2026-07-13-form-core-and-form.md`](./2026-07-13-form-core-and-form.md) 已执行）：`@component-ai/form-core` + 双端 `Form` / `FormItem` 已交付，含 Story 与构建冒烟。
+**P0 已完成**（[`2026-07-13-form-core-and-form.md`](./2026-07-13-form-core-and-form.md)）：`form-core` + 双端 Form/FormItem。  
+**P1 已完成**（[`2026-08-07-input-controls.md`](./2026-08-07-input-controls.md)）：双端 `Input` / `InputNumber` / `Textarea`；Form Story 已改用库组件。
 
-1. 用 `writing-plans` 编写 P1 输入控件计划（`Input` / `InputNumber` / `Textarea`）
-2. 执行 P1 计划
-3. 再写 P2 选择类控件 + 接入 Story
+1. 用 `writing-plans` 编写并执行 P2（`Radio`/`RadioGroup` / `Switch` + Checkbox/Select 接入 Story）
+2. Storybook 目视确认（需人工）
 
 ---
 

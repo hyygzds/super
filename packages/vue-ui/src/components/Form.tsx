@@ -225,9 +225,14 @@ export const FormItem = defineComponent({
         ctx.store.setFieldValue(props.name, readChangeValue(eventOrValue));
       };
 
+      const controlValue = value === undefined ? "" : value;
+
       const injected = cloneVNode(first, {
         id: controlId,
-        value: (value as string | number | undefined) ?? "",
+        // Keep null for InputNumber empty; only coerce missing values to "".
+        value: controlValue,
+        // Library controls use v-model; native inputs ignore modelValue.
+        modelValue: controlValue,
         disabled: childDisabled,
         "aria-invalid": showError ? true : undefined,
         "aria-describedby": showError ? errorId : undefined,
@@ -235,6 +240,7 @@ export const FormItem = defineComponent({
         // Inject both so Vue matches React onChange semantics.
         onInput: syncValue,
         onChange: syncValue,
+        "onUpdate:modelValue": syncValue,
         onBlur: () => {
           if (props.name) void ctx.store.validateField(props.name);
         },

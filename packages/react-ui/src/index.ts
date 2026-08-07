@@ -27,3 +27,10 @@ export type {
 } from "./components/VirtualGrid";
 export { Form, FormItem } from "./components/Form";
 export type { FormProps, FormItemProps, FormHandle } from "./components/Form";
+export { Input } from "./components/Input";
+export type { InputProps } from "./components/Input";
+export { InputNumber } from "./components/InputNumber";
+export type { InputNumberProps } from "./components/InputNumber";
+export { Textarea } from "./components/Textarea";
+export type { TextareaProps } from "./components/Textarea";
+

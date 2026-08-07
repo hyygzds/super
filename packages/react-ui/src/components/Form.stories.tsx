@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useState } from "react";
 import { Form, FormItem } from "./Form";
-
-const inputClass =
-  "w-full rounded border border-slate-300 px-2 py-1 text-sm";
+import { Input } from "./Input";
+import { InputNumber } from "./InputNumber";
+import { Textarea } from "./Textarea";
 
 const meta = {
   title: "React/Form",
@@ -18,9 +18,9 @@ export const Basic: Story = {
   render: function Render() {
     const [submitted, setSubmitted] = useState<string | null>(null);
     return (
-      <div className="max-w-md">
+      <div className="max-w-md space-y-2">
         <Form
-          initialValues={{ email: "" }}
+          initialValues={{ email: "", age: null, bio: "" }}
           onFinish={(values) => {
             setSubmitted(JSON.stringify(values, null, 2));
             alert(JSON.stringify(values));
@@ -31,11 +31,17 @@ export const Basic: Story = {
             label="邮箱"
             rules={[{ required: true, message: "请输入邮箱" }]}
           >
-            <input
-              className={inputClass}
-              type="email"
-              placeholder="you@example.com"
-            />
+            <Input placeholder="you@example.com" clearable />
+          </FormItem>
+          <FormItem
+            name="age"
+            label="年龄"
+            rules={[{ required: true, message: "请输入年龄" }]}
+          >
+            <InputNumber min={0} max={120} placeholder="可选数字" />
+          </FormItem>
+          <FormItem name="bio" label="简介">
+            <Textarea rows={3} showCount maxLength={100} placeholder="一句话介绍" />
           </FormItem>
           <button
             type="submit"
@@ -70,18 +76,14 @@ export const Horizontal: Story = {
             label="姓名"
             rules={[{ required: true, message: "请输入姓名" }]}
           >
-            <input className={inputClass} placeholder="张三" />
+            <Input placeholder="张三" />
           </FormItem>
           <FormItem
             name="email"
             label="邮箱"
             rules={[{ required: true, message: "请输入邮箱" }]}
           >
-            <input
-              className={inputClass}
-              type="email"
-              placeholder="you@example.com"
-            />
+            <Input placeholder="you@example.com" />
           </FormItem>
           <button
             type="submit"
@@ -112,11 +114,7 @@ export const BlurValidation: Story = {
             rules={[{ required: true, message: "请输入邮箱" }]}
             help="失焦后校验"
           >
-            <input
-              className={inputClass}
-              type="email"
-              placeholder="失焦试试"
-            />
+            <Input placeholder="失焦试试" />
           </FormItem>
         </Form>
       </div>

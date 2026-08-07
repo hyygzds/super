@@ -183,7 +183,8 @@ export function FormItem({
 
   const injected = cloneElement(child, {
     id: controlId,
-    value: (value as string | number | readonly string[] | undefined) ?? "",
+    // Keep null for InputNumber empty; only coerce missing values to "".
+    value: value === undefined ? "" : value,
     disabled: childDisabled,
     "aria-invalid": showError ? true : undefined,
     "aria-describedby": showError ? errorId : undefined,

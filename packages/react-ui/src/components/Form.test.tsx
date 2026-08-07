@@ -3,8 +3,43 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useRef } from "react";
 import { Form, FormItem, type FormHandle } from "./Form";
+import { Input } from "./Input";
+import { InputNumber } from "./InputNumber";
 
 describe("Form (React)", () => {
+  it("wires library Input and InputNumber into onFinish", async () => {
+    const user = userEvent.setup();
+    const onFinish = vi.fn();
+    render(
+      <Form
+        initialValues={{ email: "", age: null }}
+        onFinish={onFinish}
+      >
+        <FormItem
+          name="email"
+          label="邮箱"
+          rules={[{ required: true, message: "必填" }]}
+        >
+          <Input aria-label="邮箱" />
+        </FormItem>
+        <FormItem
+          name="age"
+          label="年龄"
+          rules={[{ required: true, message: "必填" }]}
+        >
+          <InputNumber aria-label="年龄" />
+        </FormItem>
+        <button type="submit">提交</button>
+      </Form>,
+    );
+    await user.type(screen.getByLabelText(/邮箱/), "a@b.c");
+    await user.type(screen.getByLabelText(/年龄/), "18");
+    await user.click(screen.getByRole("button", { name: "提交" }));
+    await waitFor(() =>
+      expect(onFinish).toHaveBeenCalledWith({ email: "a@b.c", age: 18 }),
+    );
+  });
+
   it("collects values and calls onFinish when valid", async () => {
     const user = userEvent.setup();
     const onFinish = vi.fn();
