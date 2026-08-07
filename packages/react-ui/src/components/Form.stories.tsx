@@ -1,8 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useState } from "react";
+import { Checkbox } from "./Checkbox";
 import { Form, FormItem } from "./Form";
 import { Input } from "./Input";
 import { InputNumber } from "./InputNumber";
+import { RadioGroup } from "./Radio";
+import { Select } from "./Select";
+import { Switch } from "./Switch";
 import { Textarea } from "./Textarea";
 
 const meta = {
@@ -117,6 +121,84 @@ export const BlurValidation: Story = {
             <Input placeholder="失焦试试" />
           </FormItem>
         </Form>
+      </div>
+    );
+  },
+};
+
+export const WithChoices: Story = {
+  render: function Render() {
+    const [submitted, setSubmitted] = useState<string | null>(null);
+    return (
+      <div className="max-w-md">
+        <Form
+          initialValues={{
+            role: "dev",
+            notify: true,
+            agree: false,
+            city: undefined,
+          }}
+          onFinish={(values) => {
+            setSubmitted(JSON.stringify(values, null, 2));
+          }}
+        >
+          <FormItem
+            name="role"
+            label="角色"
+            rules={[{ required: true, message: "请选择角色" }]}
+          >
+            <RadioGroup
+              options={[
+                { label: "开发", value: "dev" },
+                { label: "设计", value: "design" },
+                { label: "产品", value: "pm" },
+              ]}
+            />
+          </FormItem>
+          <FormItem
+            name="notify"
+            label="消息通知"
+            valuePropName="checked"
+            trigger="onCheckedChange"
+          >
+            <Switch />
+          </FormItem>
+          <FormItem
+            name="agree"
+            valuePropName="checked"
+            trigger="onCheckedChange"
+            rules={[
+              {
+                validator: (v) => v === true || "请勾选同意",
+              },
+            ]}
+          >
+            <Checkbox>同意服务条款</Checkbox>
+          </FormItem>
+          <FormItem
+            name="city"
+            label="城市"
+            rules={[{ required: true, message: "请选择城市" }]}
+          >
+            <Select
+              options={[
+                { label: "北京", value: "bj" },
+                { label: "上海", value: "sh" },
+                { label: "深圳", value: "sz" },
+              ]}
+              placeholder="请选择"
+            />
+          </FormItem>
+          <button
+            type="submit"
+            className="rounded bg-slate-800 px-4 py-2 text-sm text-white"
+          >
+            提交
+          </button>
+        </Form>
+        {submitted ? (
+          <pre className="mt-4 rounded bg-slate-100 p-3 text-xs">{submitted}</pre>
+        ) : null}
       </div>
     );
   },

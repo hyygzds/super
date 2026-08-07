@@ -158,6 +158,8 @@ export type FormItemProps = {
   required?: boolean;
   help?: string;
   class?: string;
+  /** Use `"checked"` for Checkbox/Switch (maps to boolean `modelValue`). */
+  valuePropName?: string;
 };
 
 let formItemSeq = 0;
@@ -171,6 +173,7 @@ export const FormItem = defineComponent({
     required: { type: Boolean, default: false },
     help: String,
     class: { type: String, default: "" },
+    valuePropName: { type: String, default: "value" },
   },
   setup(props, { slots }) {
     const ctx = inject(FORM_KEY);
@@ -220,31 +223,53 @@ export const FormItem = defineComponent({
         Boolean((first.props as { disabled?: boolean } | null)?.disabled) ||
         ctx.disabled.value;
 
+      const isCheckControl = props.valuePropName === "checked";
+
       const syncValue = (eventOrValue: unknown) => {
         if (!props.name) return;
-        ctx.store.setFieldValue(props.name, readChangeValue(eventOrValue));
+        const next = isCheckControl
+          ? Boolean(eventOrValue)
+          : readChangeValue(eventOrValue);
+        ctx.store.setFieldValue(props.name, next);
       };
 
-      const controlValue = value === undefined ? "" : value;
+      const controlValue = isCheckControl
+        ? Boolean(value)
+        : value === undefined
+          ? ""
+          : value;
 
-      const injected = cloneVNode(first, {
-        id: controlId,
-        // Keep null for InputNumber empty; only coerce missing values to "".
-        value: controlValue,
-        // Library controls use v-model; native inputs ignore modelValue.
-        modelValue: controlValue,
-        disabled: childDisabled,
-        "aria-invalid": showError ? true : undefined,
-        "aria-describedby": showError ? errorId : undefined,
-        // Native text inputs fire `input` per keystroke; `change` on commit.
-        // Inject both so Vue matches React onChange semantics.
-        onInput: syncValue,
-        onChange: syncValue,
-        "onUpdate:modelValue": syncValue,
-        onBlur: () => {
-          if (props.name) void ctx.store.validateField(props.name);
-        },
-      });
+      const injected = cloneVNode(
+        first,
+        isCheckControl
+          ? {
+              id: controlId,
+              // Do not overwrite Checkbox's string `value` option prop.
+              modelValue: controlValue,
+              disabled: childDisabled,
+              "aria-invalid": showError ? true : undefined,
+              "aria-describedby": showError ? errorId : undefined,
+              "onUpdate:modelValue": syncValue,
+              onBlur: () => {
+                if (props.name) void ctx.store.validateField(props.name);
+              },
+            }
+          : {
+              id: controlId,
+              // Keep null for InputNumber empty; only coerce missing values to "".
+              value: controlValue,
+              modelValue: controlValue,
+              disabled: childDisabled,
+              "aria-invalid": showError ? true : undefined,
+              "aria-describedby": showError ? errorId : undefined,
+              onInput: syncValue,
+              onChange: syncValue,
+              "onUpdate:modelValue": syncValue,
+              onBlur: () => {
+                if (props.name) void ctx.store.validateField(props.name);
+              },
+            },
+      );
 
       const needStar =
         props.required || props.rules?.some((r) => r.required) === true;

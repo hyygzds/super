@@ -20,6 +20,14 @@ export { Pagination } from "./components/Pagination";
 export type { PaginationProps } from "./components/Pagination";
 export { Checkbox } from "./components/Checkbox";
 export type { CheckboxProps } from "./components/Checkbox";
+export { Radio, RadioGroup } from "./components/Radio";
+export type {
+  RadioProps,
+  RadioGroupProps,
+  RadioOption,
+} from "./components/Radio";
+export { Switch } from "./components/Switch";
+export type { SwitchProps } from "./components/Switch";
 export { VirtualGrid } from "./components/VirtualGrid";
 export type {
   VirtualGridProps,

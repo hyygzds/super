@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { defineComponent, nextTick, ref } from "vue";
+import { Checkbox } from "./Checkbox";
 import { Form, FormItem } from "./Form";
+import { Switch } from "./Switch";
 
 describe("Form (Vue)", () => {
   it("collects values and emits finish when valid", async () => {
@@ -142,5 +144,34 @@ describe("Form (Vue)", () => {
     expect(alert.exists()).toBe(true);
     expect(alert.text()).toContain("必填");
     expect(onFinish).not.toHaveBeenCalled();
+  });
+
+  it("wires Checkbox and Switch via valuePropName checked", async () => {
+    const onFinish = vi.fn();
+    const wrapper = mount(
+      defineComponent({
+        setup() {
+          return () => (
+            <Form
+              initialValues={{ agree: false, notify: false }}
+              onFinish={onFinish}
+            >
+              <FormItem name="agree" valuePropName="checked">
+                <Checkbox>同意</Checkbox>
+              </FormItem>
+              <FormItem name="notify" label="通知" valuePropName="checked">
+                <Switch />
+              </FormItem>
+              <button type="submit">提交</button>
+            </Form>
+          );
+        },
+      }),
+    );
+    await wrapper.find('input[type="checkbox"]').setValue(true);
+    await wrapper.find('[role="switch"]').trigger("click");
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    expect(onFinish).toHaveBeenCalledWith({ agree: true, notify: true });
   });
 });

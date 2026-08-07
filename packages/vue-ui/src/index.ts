@@ -11,6 +11,9 @@ export {
 } from "./components/Tabs";
 export { Pagination } from "./components/Pagination";
 export { Checkbox } from "./components/Checkbox";
+export { Radio, RadioGroup } from "./components/Radio";
+export type { RadioOption, RadioOrientation } from "./components/Radio";
+export { Switch } from "./components/Switch";
 export { Input } from "./components/Input";
 export type { InputType } from "./components/Input";
 export { InputNumber } from "./components/InputNumber";

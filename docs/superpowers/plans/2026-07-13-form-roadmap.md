@@ -20,7 +20,7 @@
 |------|----------|--------|----------|
 | 1 | [`2026-07-13-form-core-and-form.md`](./2026-07-13-form-core-and-form.md) | `@component-ai/form-core` + 双端 `Form` / `FormItem`（P0） | 无 |
 | 2 | [`2026-08-07-input-controls.md`](./2026-08-07-input-controls.md) | 双端 `Input` / `InputNumber` / `Textarea`（P1） | 建议在 Form 接线 Story 前；可与 1 部分并行，但完整 Form demo 依赖本项 |
-| 3 | *待写* `YYYY-MM-DD-choice-controls.md` | 双端 `Radio`/`RadioGroup` / `Switch` + Checkbox/Select 接入 Story（P2） | 依赖 1；控件本身可不依赖 Form，接入 Story 依赖 1 |
+| 3 | [`2026-08-07-choice-controls.md`](./2026-08-07-choice-controls.md) | 双端 `Radio`/`RadioGroup` / `Switch` + Checkbox/Select 接入 Story（P2） | 依赖 1；控件本身可不依赖 Form，接入 Story 依赖 1 |
 
 **规则（来自 spec §5）：** 原子控件必须先作为完整库组件合入；Form 只消费公开 API。P0 可用原生 input 验证接线，P1 起 Story 改用库组件。
 
@@ -36,10 +36,11 @@
 ## 当前应执行
 
 **P0 已完成**（[`2026-07-13-form-core-and-form.md`](./2026-07-13-form-core-and-form.md)）：`form-core` + 双端 Form/FormItem。  
-**P1 已完成**（[`2026-08-07-input-controls.md`](./2026-08-07-input-controls.md)）：双端 `Input` / `InputNumber` / `Textarea`；Form Story 已改用库组件。
+**P1 已完成**（[`2026-08-07-input-controls.md`](./2026-08-07-input-controls.md)）：双端 `Input` / `InputNumber` / `Textarea`。  
+**P2 已完成**（[`2026-08-07-choice-controls.md`](./2026-08-07-choice-controls.md)）：`Radio`/`RadioGroup` / `Switch`；FormItem `valuePropName` 接入 Checkbox/Switch；Select 接入 Story。
 
-1. 用 `writing-plans` 编写并执行 P2（`Radio`/`RadioGroup` / `Switch` + Checkbox/Select 接入 Story）
-2. Storybook 目视确认（需人工）
+1. Storybook 目视确认 Form P0–P2（需人工）
+2. 若有后续：嵌套路径 / 异步校验队列等另开规格
 
 ---
 

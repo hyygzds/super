@@ -2,9 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useRef } from "react";
+import { Checkbox } from "./Checkbox";
 import { Form, FormItem, type FormHandle } from "./Form";
 import { Input } from "./Input";
 import { InputNumber } from "./InputNumber";
+import { Switch } from "./Switch";
 
 describe("Form (React)", () => {
   it("wires library Input and InputNumber into onFinish", async () => {
@@ -55,6 +57,36 @@ describe("Form (React)", () => {
     await user.click(screen.getByRole("button", { name: "提交" }));
     await waitFor(() =>
       expect(onFinish).toHaveBeenCalledWith({ email: "a@b.c" }),
+    );
+  });
+
+  it("wires Checkbox and Switch via valuePropName checked", async () => {
+    const user = userEvent.setup();
+    const onFinish = vi.fn();
+    render(
+      <Form
+        initialValues={{ agree: false, notify: false }}
+        onFinish={onFinish}
+      >
+        <FormItem name="agree" valuePropName="checked" trigger="onCheckedChange">
+          <Checkbox>同意</Checkbox>
+        </FormItem>
+        <FormItem
+          name="notify"
+          label="通知"
+          valuePropName="checked"
+          trigger="onCheckedChange"
+        >
+          <Switch />
+        </FormItem>
+        <button type="submit">提交</button>
+      </Form>,
+    );
+    await user.click(screen.getByRole("checkbox", { name: "同意" }));
+    await user.click(screen.getByRole("switch"));
+    await user.click(screen.getByRole("button", { name: "提交" }));
+    await waitFor(() =>
+      expect(onFinish).toHaveBeenCalledWith({ agree: true, notify: true }),
     );
   });
 

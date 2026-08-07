@@ -119,6 +119,10 @@ export type FormItemProps = {
   help?: string;
   extra?: ReactNode;
   className?: string;
+  /** Prop name for the field value. Use `"checked"` for Checkbox/Switch. */
+  valuePropName?: string;
+  /** Event prop that receives the next value. Use `"onCheckedChange"` for Checkbox/Switch. */
+  trigger?: string;
   children: ReactElement;
 };
 
@@ -144,6 +148,8 @@ export function FormItem({
   help,
   extra,
   className = "",
+  valuePropName = "value",
+  trigger = "onChange",
   children,
 }: FormItemProps) {
   const { store, layout, labelWidth, disabled } = useFormContext("FormItem");
@@ -181,21 +187,32 @@ export function FormItem({
   const child = Children.only(children) as ReactElement<Record<string, unknown>>;
   const childDisabled = Boolean(child.props.disabled) || disabled;
 
+  const isCheckControl = valuePropName === "checked";
+  const controlValue = isCheckControl
+    ? Boolean(value)
+    : value === undefined
+      ? ""
+      : value;
+
+  const handleTrigger = (eventOrValue: unknown) => {
+    if (!name) return;
+    const next = isCheckControl
+      ? Boolean(eventOrValue)
+      : readChangeValue(eventOrValue);
+    store.setFieldValue(name, next);
+    const childTrigger = child.props[trigger] as
+      | ((v: unknown) => void)
+      | undefined;
+    childTrigger?.(eventOrValue);
+  };
+
   const injected = cloneElement(child, {
     id: controlId,
-    // Keep null for InputNumber empty; only coerce missing values to "".
-    value: value === undefined ? "" : value,
+    [valuePropName]: controlValue,
     disabled: childDisabled,
     "aria-invalid": showError ? true : undefined,
     "aria-describedby": showError ? errorId : undefined,
-    onChange: (eventOrValue: unknown) => {
-      if (!name) return;
-      store.setFieldValue(name, readChangeValue(eventOrValue));
-      const childOnChange = child.props.onChange as
-        | ((v: unknown) => void)
-        | undefined;
-      childOnChange?.(eventOrValue);
-    },
+    [trigger]: handleTrigger,
     onBlur: (event: unknown) => {
       if (name) void store.validateField(name);
       const childOnBlur = child.props.onBlur as ((e: unknown) => void) | undefined;
