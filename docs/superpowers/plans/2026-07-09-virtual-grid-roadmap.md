@@ -24,7 +24,7 @@
 | 4 | Form 体系 P1（见 [`2026-07-13-form-roadmap.md`](./2026-07-13-form-roadmap.md)） | 双端完整 `Input`（及 InputNumber/Textarea） | VirtualGrid P5 前 |
 | 5 | [`2026-07-12-virtual-grid-p0.md`](./2026-07-12-virtual-grid-p0.md) | VirtualGrid 基础表 + 虚拟滚动（双端） | 依赖 1 |
 | 6 | [`2026-07-12-virtual-grid-p1.md`](./2026-07-12-virtual-grid-p1.md) | 选中 + 分页接线（双端） | 依赖 1、2、3、5 |
-| 7 | *待写* `YYYY-MM-DD-virtual-grid-p2.md` | 模板、自动行高、固定列 | 依赖 5 |
+| 7 | [`2026-08-07-virtual-grid-p2.md`](./2026-08-07-virtual-grid-p2.md) | 模板、自动行高、固定列 | 依赖 5 |
 | 8 | *待写* `YYYY-MM-DD-virtual-grid-p3.md` | 表头/数据分组、合并单元格 | 依赖 5；扩展 grid-core |
 | 9 | *待写* `YYYY-MM-DD-virtual-grid-p4.md` | 树、异步加载、行扩展 | 依赖 5、3；扩展 grid-core |
 | 10 | *待写* `YYYY-MM-DD-virtual-grid-p5.md` | 编辑、远端分页 | 依赖 4、2、5 |
@@ -47,7 +47,8 @@
 3. 完成 [`2026-07-12-checkbox.md`](./2026-07-12-checkbox.md)（已完成，代码待 commit）
 4. 完成 [`2026-07-12-virtual-grid-p0.md`](./2026-07-12-virtual-grid-p0.md)（已完成，代码待 commit）
 5. 完成 [`2026-07-12-virtual-grid-p1.md`](./2026-07-12-virtual-grid-p1.md)（已完成，代码待 commit）
-6. Input 已由 Form P1 交付（[`2026-08-07-input-controls.md`](./2026-08-07-input-controls.md)）；VirtualGrid 下一能力批次可用 brainstorming / writing-plans 写 P2（模板、自动行高、固定列）或继续 Form P2
+6. Input / Form P0–P2 已交付；[`2026-08-07-virtual-grid-p2.md`](./2026-08-07-virtual-grid-p2.md) 已执行（模板、自动行高、固定列）
+7. 用 writing-plans 写并执行 P3（分组 / 合并单元格）
 
 ---
 

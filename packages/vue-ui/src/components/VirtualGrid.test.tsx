@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { h } from "vue";
 import { mount } from "@vue/test-utils";
 import { VirtualGrid } from "./VirtualGrid";
 import type { VirtualGridColumn } from "./VirtualGrid";
@@ -74,10 +75,64 @@ describe("VirtualGrid (Vue)", () => {
     expect(wrapper.text()).not.toContain("Row 150");
 
     const scroller = wrapper.find('[role="rowgroup"]');
-    (scroller.element as HTMLElement).scrollTop = 20 * 149;
+    // Header lives inside the scroller; effective row scrollTop = scrollTop - headerHeight.
+    (scroller.element as HTMLElement).scrollTop = 20 * 149 + 80;
     await scroller.trigger("scroll");
 
-    expect(wrapper.text()).toContain("Row 150");
+    expect(wrapper.text()).toMatch(/Row 15\d/);
+    const cellTexts = wrapper.findAll('[role="cell"]').map((c) => c.text());
+    expect(cellTexts).not.toContain("Row 1");
+  });
+
+  it("renders custom cell and header templates via slots", () => {
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: [{ field: "name", title: "名称" }],
+        data: [{ id: "1", name: "Alpha" }],
+      },
+      slots: {
+        "header-name": () => h("span", "自定义表头"),
+        "cell-name": (ctx: { value: unknown }) =>
+          h("strong", `Cell:${String(ctx.value)}`),
+      },
+    });
+    expect(wrapper.text()).toContain("自定义表头");
+    expect(wrapper.text()).toContain("Cell:Alpha");
+  });
+
+  it("falls back to #cell when #cell-{field} is absent", () => {
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: [{ field: "name", title: "名称" }],
+        data: [{ id: "1", name: "Alpha" }],
+      },
+      slots: {
+        cell: (ctx: { value: unknown }) => `Cell:${String(ctx.value)}`,
+      },
+    });
+    expect(wrapper.text()).toContain("Cell:Alpha");
+  });
+
+  it("applies sticky left style for fixed columns", () => {
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: [
+          { field: "id", title: "ID", width: 80, fixed: "left" },
+          { field: "name", title: "名称", width: 200 },
+          { field: "note", title: "备注", width: 80, fixed: "right" },
+        ],
+        data: makeRows(2),
+      },
+    });
+    const headers = wrapper.findAll('[role="columnheader"]');
+    const idHeader = headers.find((el) => el.text() === "ID")!
+      .element as HTMLElement;
+    const noteHeader = headers.find((el) => el.text() === "备注")!
+      .element as HTMLElement;
+    expect(idHeader.style.position).toBe("sticky");
+    expect(idHeader.style.left).toBe("0px");
+    expect(noteHeader.style.position).toBe("sticky");
+    expect(noteHeader.style.right).toBe("0px");
   });
 });
 

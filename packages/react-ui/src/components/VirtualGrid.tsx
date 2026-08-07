@@ -10,7 +10,9 @@ import {
 } from "@component-ai/grid-core";
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type ReactNode,
@@ -18,7 +20,21 @@ import {
 import { Checkbox } from "./Checkbox";
 import { Pagination } from "./Pagination";
 
-export type VirtualGridColumn = GridColumn;
+export type VirtualGridCellContext = {
+  row: Record<string, unknown>;
+  column: VirtualGridColumn;
+  value: unknown;
+  rowIndex: number;
+};
+
+export type VirtualGridHeaderContext = {
+  column: VirtualGridColumn;
+};
+
+export type VirtualGridColumn = GridColumn & {
+  render?: (ctx: VirtualGridCellContext) => ReactNode;
+  renderHeader?: (ctx: VirtualGridHeaderContext) => ReactNode;
+};
 
 export type VirtualGridProps = {
   columns: VirtualGridColumn[];
@@ -28,6 +44,7 @@ export type VirtualGridProps = {
   height?: number | string;
   virtual?: boolean;
   overscan?: number;
+  autoHeight?: boolean;
   bordered?: boolean;
   stripe?: boolean;
   showRowNumber?: boolean;
@@ -47,19 +64,130 @@ export type VirtualGridProps = {
   pageSizeOptions?: number[];
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
+  renderCell?: (ctx: VirtualGridCellContext) => ReactNode;
+  renderHeader?: (ctx: VirtualGridHeaderContext) => ReactNode;
 };
 
 const ROW_NUMBER_WIDTH = 48;
 const SELECTION_WIDTH = 40;
+const DEFAULT_COL_WIDTH = 120;
+
+type LayoutCol =
+  | { kind: "selection"; width: number; stickyLeft: number }
+  | { kind: "rowNumber"; width: number; stickyLeft: number }
+  | {
+      kind: "data";
+      column: VirtualGridColumn;
+      width: number;
+      stickyLeft?: number;
+      stickyRight?: number;
+    };
 
 function isNodeDevelopment(): boolean {
-  const proc = (globalThis as unknown as { process?: { env?: { NODE_ENV?: string } } })
-    .process;
+  const proc = (
+    globalThis as unknown as { process?: { env?: { NODE_ENV?: string } } }
+  ).process;
   return proc?.env?.NODE_ENV === "development";
 }
 
 function toCssHeight(height: number | string): string {
   return typeof height === "number" ? `${height}px` : height;
+}
+
+function colWidth(col: VirtualGridColumn, forcePx: boolean): number | null {
+  if (col.width != null) return col.width;
+  if (col.fixed || forcePx) return DEFAULT_COL_WIDTH;
+  return null;
+}
+
+function buildLayout(
+  visibleColumns: VirtualGridColumn[],
+  selectable: boolean,
+  showRowNumber: boolean,
+): LayoutCol[] {
+  const hasFixed = visibleColumns.some((c) => c.fixed);
+  const layout: LayoutCol[] = [];
+  let left = 0;
+
+  if (selectable) {
+    layout.push({ kind: "selection", width: SELECTION_WIDTH, stickyLeft: left });
+    left += SELECTION_WIDTH;
+  }
+  if (showRowNumber) {
+    layout.push({ kind: "rowNumber", width: ROW_NUMBER_WIDTH, stickyLeft: left });
+    left += ROW_NUMBER_WIDTH;
+  }
+
+  for (const column of visibleColumns) {
+    if (column.fixed === "left") {
+      const width = colWidth(column, true)!;
+      layout.push({ kind: "data", column, width, stickyLeft: left });
+      left += width;
+    }
+  }
+
+  for (const column of visibleColumns) {
+    if (!column.fixed) {
+      const width = colWidth(column, hasFixed);
+      // width 0 → 1fr in template (only when no fixed columns)
+      layout.push({
+        kind: "data",
+        column,
+        width: width ?? 0,
+      });
+    }
+  }
+
+  const rightCols = visibleColumns.filter((c) => c.fixed === "right");
+  let right = 0;
+  const rightLayout: LayoutCol[] = [];
+  for (let i = rightCols.length - 1; i >= 0; i--) {
+    const column = rightCols[i]!;
+    const width = colWidth(column, true)!;
+    rightLayout.unshift({
+      kind: "data",
+      column,
+      width,
+      stickyRight: right,
+    });
+    right += width;
+  }
+  layout.push(...rightLayout);
+  return layout;
+}
+
+function stickyStyle(
+  item: LayoutCol,
+  isHeader: boolean,
+  bg: string,
+): CSSProperties | undefined {
+  if (item.kind === "selection" || item.kind === "rowNumber") {
+    return {
+      position: "sticky",
+      left: item.stickyLeft,
+      zIndex: isHeader ? 4 : 2,
+      background: bg,
+    };
+  }
+  if (item.stickyLeft != null) {
+    return {
+      position: "sticky",
+      left: item.stickyLeft,
+      zIndex: isHeader ? 4 : 2,
+      background: bg,
+      boxShadow: "2px 0 4px -2px rgba(15,23,42,0.12)",
+    };
+  }
+  if (item.stickyRight != null) {
+    return {
+      position: "sticky",
+      right: item.stickyRight,
+      zIndex: isHeader ? 4 : 2,
+      background: bg,
+      boxShadow: "-2px 0 4px -2px rgba(15,23,42,0.12)",
+    };
+  }
+  return isHeader ? { background: bg } : undefined;
 }
 
 export function VirtualGrid({
@@ -70,6 +198,7 @@ export function VirtualGrid({
   height,
   virtual = false,
   overscan = 4,
+  autoHeight = false,
   bordered = true,
   stripe = false,
   showRowNumber = false,
@@ -89,8 +218,15 @@ export function VirtualGrid({
   pageSizeOptions,
   onPageChange,
   onPageSizeChange,
+  renderCell,
+  renderHeader,
 }: VirtualGridProps) {
   const [scrollTop, setScrollTop] = useState(0);
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const [heightCache, setHeightCache] = useState<Array<number | undefined>>([]);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+
   const [uncontrolledSelectedKeys, setUncontrolledSelectedKeys] =
     useState<string[]>(defaultSelectedKeys);
   const [uncontrolledPage, setUncontrolledPage] = useState(defaultPage);
@@ -135,6 +271,10 @@ export function VirtualGrid({
     [data, pagination, page, pageSize],
   );
 
+  useEffect(() => {
+    setHeightCache(new Array(pagedRows.length));
+  }, [pagedRows.length, page, pageSize]);
+
   function rowKey(row: Record<string, unknown>, absoluteIndex: number): string {
     const v = row[idField];
     return v !== undefined && v !== null ? String(v) : String(absoluteIndex);
@@ -152,132 +292,279 @@ export function VirtualGrid({
     );
   }
 
+  const rowScrollTop = Math.max(0, scrollTop - headerHeight);
+
   const win = computeVirtualWindow({
     enabled: canVirtualize,
     rowCount: pagedRows.length,
     rowHeight,
-    scrollTop,
-    viewportHeight: canVirtualize ? (height as number) : 0,
+    rowHeights: autoHeight ? heightCache : undefined,
+    scrollTop: rowScrollTop,
+    viewportHeight: canVirtualize
+      ? Math.max(0, (height as number) - headerHeight)
+      : 0,
     overscan,
   });
 
-  const gridTemplateColumns = useMemo(() => {
-    const widths = visibleColumns.map((c) => (c.width ? `${c.width}px` : "1fr"));
-    const prefixed = [
-      ...(selectable ? [`${SELECTION_WIDTH}px`] : []),
-      ...(showRowNumber ? [`${ROW_NUMBER_WIDTH}px`] : []),
-      ...widths,
-    ];
-    return prefixed.join(" ");
-  }, [visibleColumns, showRowNumber, selectable]);
+  const layout = useMemo(
+    () => buildLayout(visibleColumns, selectable, showRowNumber),
+    [visibleColumns, selectable, showRowNumber],
+  );
+
+  const gridTemplateColumns = useMemo(
+    () =>
+      layout
+        .map((item) => {
+          if (item.kind !== "data") return `${item.width}px`;
+          if (item.width === 0) return "1fr";
+          return `${item.width}px`;
+        })
+        .join(" "),
+    [layout],
+  );
+
+  useLayoutEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const h = el.offsetHeight;
+    if (Math.abs(h - headerHeight) >= 1) setHeaderHeight(h);
+  });
+
+  useLayoutEffect(() => {
+    if (!autoHeight) return;
+    const root = scrollerRef.current;
+    if (!root) return;
+    const nodes = root.querySelectorAll<HTMLElement>("[data-vg-row]");
+    const observers: ResizeObserver[] = [];
+
+    nodes.forEach((node) => {
+      const index = Number(node.dataset.vgRow);
+      if (Number.isNaN(index)) return;
+      const apply = () => {
+        const h = node.offsetHeight;
+        setHeightCache((prev) => {
+          const cur = prev[index];
+          if (cur !== undefined && Math.abs(cur - h) < 1) return prev;
+          const next = prev.slice();
+          while (next.length < pagedRows.length) next.push(undefined);
+          next[index] = h;
+          return next;
+        });
+      };
+      apply();
+      if (typeof ResizeObserver === "undefined") return;
+      const ro = new ResizeObserver(apply);
+      ro.observe(node);
+      observers.push(ro);
+    });
+
+    return () => observers.forEach((o) => o.disconnect());
+  }, [
+    autoHeight,
+    pagedRows.length,
+    win.startIndex,
+    win.endIndex,
+    canVirtualize,
+  ]);
 
   const rootCls =
     `inline-block w-full overflow-hidden rounded-lg text-sm text-slate-800 ${
       bordered ? "border border-slate-200" : ""
     } ${className}`.trim();
-  const cellBase = `flex items-center overflow-hidden px-3 py-2 truncate ${
-    bordered ? "border-b border-slate-200" : ""
-  }`;
+
+  function cellClass(auto: boolean): string {
+    return `flex items-center overflow-hidden px-3 py-2 ${
+      auto ? "whitespace-normal break-words" : "truncate"
+    } ${bordered ? "border-b border-slate-200" : ""}`;
+  }
 
   const allSelected = isAllSelected(selectedKeys, allKeys);
   const partiallySelected = isIndeterminate(selectedKeys, allKeys);
 
+  function renderDataCell(
+    column: VirtualGridColumn,
+    row: Record<string, unknown>,
+    rowIndex: number,
+  ): ReactNode {
+    const value = row[column.field];
+    const ctx: VirtualGridCellContext = { row, column, value, rowIndex };
+    if (column.render) return column.render(ctx);
+    if (renderCell) return renderCell(ctx);
+    return String(value ?? "");
+  }
+
+  function renderHeaderCell(column: VirtualGridColumn): ReactNode {
+    const ctx: VirtualGridHeaderContext = { column };
+    if (column.renderHeader) return column.renderHeader(ctx);
+    if (renderHeader) return renderHeader(ctx);
+    return column.title;
+  }
+
   function renderRow(row: Record<string, unknown>, absoluteIndex: number) {
     const key = rowKey(row, absoluteIndex);
+    const stripeBg = stripe && absoluteIndex % 2 === 1;
+    const rowBg = stripeBg ? "rgb(248 250 252)" : "rgb(255 255 255)";
+    const measured = heightCache[absoluteIndex];
+    const rowStyle: CSSProperties = {
+      display: "grid",
+      gridTemplateColumns,
+      ...(autoHeight
+        ? { minHeight: rowHeight, height: measured }
+        : { height: rowHeight }),
+    };
+
     return (
       <div
         key={key}
         role="row"
         aria-rowindex={absoluteIndex + 2}
-        style={{ display: "grid", gridTemplateColumns, height: rowHeight }}
-        className={stripe && absoluteIndex % 2 === 1 ? "bg-slate-50" : ""}
+        data-vg-row={absoluteIndex}
+        style={rowStyle}
+        className={stripeBg ? "bg-slate-50" : "bg-white"}
       >
-        {selectable ? (
-          <div role="cell" className={cellBase}>
-            <Checkbox
-              checked={selectedKeys.includes(key)}
-              onCheckedChange={() =>
-                commitSelectedKeys(toggleKey(selectedKeys, key, multiple))
-              }
+        {layout.map((item) => {
+          if (item.kind === "selection") {
+            return (
+              <div
+                key="__sel"
+                role="cell"
+                className={cellClass(autoHeight)}
+                style={stickyStyle(item, false, rowBg)}
+              >
+                <Checkbox
+                  checked={selectedKeys.includes(key)}
+                  onCheckedChange={() =>
+                    commitSelectedKeys(toggleKey(selectedKeys, key, multiple))
+                  }
+                >
+                  <span className="sr-only">选择第 {absoluteIndex + 1} 行</span>
+                </Checkbox>
+              </div>
+            );
+          }
+          if (item.kind === "rowNumber") {
+            return (
+              <div
+                key="__num"
+                role="cell"
+                className={cellClass(autoHeight)}
+                style={stickyStyle(item, false, rowBg)}
+              >
+                {absoluteIndex + 1}
+              </div>
+            );
+          }
+          return (
+            <div
+              key={item.column.field}
+              role="cell"
+              className={cellClass(autoHeight)}
+              style={stickyStyle(item, false, rowBg)}
             >
-              <span className="sr-only">选择第 {absoluteIndex + 1} 行</span>
-            </Checkbox>
-          </div>
-        ) : null}
-        {showRowNumber ? (
-          <div role="cell" className={cellBase}>
-            {absoluteIndex + 1}
-          </div>
-        ) : null}
-        {visibleColumns.map((col) => (
-          <div key={col.field} role="cell" className={cellBase}>
-            {String(row[col.field] ?? "")}
-          </div>
-        ))}
+              {renderDataCell(item.column, row, absoluteIndex)}
+            </div>
+          );
+        })}
       </div>
     );
   }
 
-  const headerStyle: CSSProperties = { display: "grid", gridTemplateColumns };
+  const headerBg = "rgb(248 250 252)";
+  const scrollerStyle: CSSProperties | undefined =
+    height !== undefined ? { height: toCssHeight(height) } : undefined;
+
+  const bodyRows = canVirtualize
+    ? pagedRows
+        .slice(win.startIndex, win.endIndex)
+        .map((row, i) => renderRow(row, win.startIndex + i))
+    : pagedRows.map((row, absoluteIndex) => renderRow(row, absoluteIndex));
 
   return (
     <div className={rootCls} role="table" aria-rowcount={pagedRows.length + 1}>
       <div
-        role="row"
-        aria-rowindex={1}
-        style={headerStyle}
-        className="bg-slate-50 font-medium"
-      >
-        {selectable ? (
-          <div role="columnheader" className={cellBase}>
-            {multiple && showSelectAll ? (
-              <Checkbox
-                checked={allSelected}
-                indeterminate={partiallySelected}
-                onCheckedChange={() =>
-                  commitSelectedKeys(
-                    allSelected ? clearKeys() : selectAllKeys(allKeys),
-                  )
-                }
-              >
-                <span className="sr-only">全选</span>
-              </Checkbox>
-            ) : null}
-          </div>
-        ) : null}
-        {showRowNumber ? (
-          <div role="columnheader" className={cellBase} aria-label="序号">
-            #
-          </div>
-        ) : null}
-        {visibleColumns.map((col) => (
-          <div key={col.field} role="columnheader" className={cellBase}>
-            {col.title}
-          </div>
-        ))}
-      </div>
-      <div
+        ref={scrollerRef}
+        data-vg-scroller=""
         role="rowgroup"
-        className="relative overflow-y-auto"
-        style={height !== undefined ? { height: toCssHeight(height) } : undefined}
+        className="relative overflow-auto"
+        style={scrollerStyle}
         onScroll={(e) => {
-          if (canVirtualize) setScrollTop(e.currentTarget.scrollTop);
+          setScrollTop(e.currentTarget.scrollTop);
         }}
       >
+        <div
+          ref={headerRef}
+          role="row"
+          aria-rowindex={1}
+          style={{
+            display: "grid",
+            gridTemplateColumns,
+            position: "sticky",
+            top: 0,
+            zIndex: 5,
+          }}
+          className="bg-slate-50 font-medium"
+        >
+          {layout.map((item) => {
+            if (item.kind === "selection") {
+              return (
+                <div
+                  key="__sel"
+                  role="columnheader"
+                  className={cellClass(false)}
+                  style={stickyStyle(item, true, headerBg)}
+                >
+                  {multiple && showSelectAll ? (
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={partiallySelected}
+                      onCheckedChange={() =>
+                        commitSelectedKeys(
+                          allSelected ? clearKeys() : selectAllKeys(allKeys),
+                        )
+                      }
+                    >
+                      <span className="sr-only">全选</span>
+                    </Checkbox>
+                  ) : null}
+                </div>
+              );
+            }
+            if (item.kind === "rowNumber") {
+              return (
+                <div
+                  key="__num"
+                  role="columnheader"
+                  className={cellClass(false)}
+                  style={stickyStyle(item, true, headerBg)}
+                  aria-label="序号"
+                >
+                  #
+                </div>
+              );
+            }
+            return (
+              <div
+                key={item.column.field}
+                role="columnheader"
+                className={cellClass(false)}
+                style={stickyStyle(item, true, headerBg)}
+              >
+                {renderHeaderCell(item.column)}
+              </div>
+            );
+          })}
+        </div>
+
         {pagedRows.length === 0 ? (
-          <div className="px-3 py-6 text-center text-slate-400">
-            {emptyText}
-          </div>
+          <div className="px-3 py-6 text-center text-slate-400">{emptyText}</div>
         ) : canVirtualize ? (
           <div style={{ height: win.totalHeight, position: "relative" }}>
             <div style={{ transform: `translateY(${win.offsetY}px)` }}>
-              {pagedRows
-                .slice(win.startIndex, win.endIndex)
-                .map((row, i) => renderRow(row, win.startIndex + i))}
+              {bodyRows}
             </div>
           </div>
         ) : (
-          pagedRows.map((row, absoluteIndex) => renderRow(row, absoluteIndex))
+          bodyRows
         )}
       </div>
       {pagination ? (

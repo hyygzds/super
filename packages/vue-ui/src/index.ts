@@ -19,6 +19,10 @@ export type { InputType } from "./components/Input";
 export { InputNumber } from "./components/InputNumber";
 export { Textarea } from "./components/Textarea";
 export { VirtualGrid } from "./components/VirtualGrid";
-export type { VirtualGridColumn } from "./components/VirtualGrid";
+export type {
+  VirtualGridColumn,
+  VirtualGridCellContext,
+  VirtualGridHeaderContext,
+} from "./components/VirtualGrid";
 export { Form, FormItem } from "./components/Form";
 export type { FormProps, FormItemProps } from "./components/Form";

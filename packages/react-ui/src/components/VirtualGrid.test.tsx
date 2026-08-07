@@ -71,9 +71,46 @@ describe("VirtualGrid (React)", () => {
     expect(screen.queryByText("Row 150")).not.toBeInTheDocument();
 
     const scroller = screen.getByRole("rowgroup");
-    fireEvent.scroll(scroller, { target: { scrollTop: 20 * 149 } });
+    // Header lives inside the scroller; effective row scrollTop = scrollTop - headerHeight.
+    fireEvent.scroll(scroller, { target: { scrollTop: 20 * 149 + 80 } });
 
-    expect(screen.getByText("Row 150")).toBeInTheDocument();
+    expect(screen.getAllByText(/Row 15\d/).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Row 1")).not.toBeInTheDocument();
+  });
+
+  it("renders custom cell and header templates", () => {
+    render(
+      <VirtualGrid
+        columns={[
+          {
+            field: "name",
+            title: "名称",
+            renderHeader: () => <span>自定义表头</span>,
+            render: ({ value }) => <strong>Cell:{String(value)}</strong>,
+          },
+        ]}
+        data={[{ id: "1", name: "Alpha" }]}
+      />,
+    );
+    expect(screen.getByText("自定义表头")).toBeInTheDocument();
+    expect(screen.getByText("Cell:Alpha")).toBeInTheDocument();
+  });
+
+  it("applies sticky left style for fixed columns", () => {
+    render(
+      <VirtualGrid
+        columns={[
+          { field: "id", title: "ID", width: 80, fixed: "left" },
+          { field: "name", title: "名称", width: 200 },
+          { field: "note", title: "备注", width: 80, fixed: "right" },
+        ]}
+        data={makeRows(2)}
+      />,
+    );
+    const idHeader = screen.getByRole("columnheader", { name: "ID" });
+    expect(idHeader).toHaveStyle({ position: "sticky", left: "0px" });
+    const noteHeader = screen.getByRole("columnheader", { name: "备注" });
+    expect(noteHeader).toHaveStyle({ position: "sticky", right: "0px" });
   });
 });
 
