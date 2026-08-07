@@ -10,6 +10,7 @@ export default defineConfig({
   plugins: [vue(), vueJsx()],
   resolve: {
     alias: {
+      "@component-ai/form-core": resolve(rootDir, "../form-core/src/index.ts"),
       "@component-ai/grid-core": resolve(rootDir, "../grid-core/src/index.ts"),
     },
   },

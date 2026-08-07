@@ -35,8 +35,10 @@
 
 ## 当前应执行
 
-1. 执行 [`2026-07-13-form-core-and-form.md`](./2026-07-13-form-core-and-form.md)（P0）
-2. 再用 `writing-plans` 编写并执行 P1 输入控件计划
+**P0 已完成**（[`2026-07-13-form-core-and-form.md`](./2026-07-13-form-core-and-form.md) 已执行）：`@component-ai/form-core` + 双端 `Form` / `FormItem` 已交付，含 Story 与构建冒烟。
+
+1. 用 `writing-plans` 编写 P1 输入控件计划（`Input` / `InputNumber` / `Textarea`）
+2. 执行 P1 计划
 3. 再写 P2 选择类控件 + 接入 Story
 
 ---

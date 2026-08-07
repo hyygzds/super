@@ -31,7 +31,9 @@ jobs:
 
       # Workspace packages export dist/; fresh clones have no dist until build.
       - name: Build shared packages
-        run: npm run build -w @component-ai/grid-core
+        run: |
+          npm run build -w @component-ai/grid-core
+          npm run build -w @component-ai/form-core
 
       - name: Test
         run: npm test
