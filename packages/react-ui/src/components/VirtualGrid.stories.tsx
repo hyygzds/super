@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { useState } from "react";
 import { VirtualGrid, type VirtualGridColumn } from "./VirtualGrid";
 
 const columns: VirtualGridColumn[] = [
@@ -330,5 +331,119 @@ export const ExpandRow: Story = {
         <div className="text-xs text-slate-400">id = {String(row.id)}</div>
       </div>
     ),
+  },
+};
+
+const editColumns: VirtualGridColumn[] = [
+  { field: "id", title: "标识", width: 80, editable: false },
+  { field: "name", title: "名称", width: 140, editable: true },
+  { field: "fullName", title: "全称", editable: true },
+];
+
+export const EditCell: Story = {
+  args: {
+    columns: editColumns,
+    data: makeRows(8),
+    editable: true,
+    editMode: "cell",
+    height: 360,
+  },
+  render: function EditCellStory(args) {
+    const [rows, setRows] = useState(args.data);
+    return (
+      <VirtualGrid
+        {...args}
+        data={rows}
+        onCellChange={({ rowKey, field, value }) => {
+          setRows((prev) =>
+            prev.map((row) =>
+              String(row.id) === rowKey ? { ...row, [field]: value } : row,
+            ),
+          );
+        }}
+      />
+    );
+  },
+};
+
+export const EditRow: Story = {
+  args: {
+    columns: editColumns,
+    data: makeRows(8),
+    editable: true,
+    editMode: "row",
+    height: 360,
+  },
+  render: function EditRowStory(args) {
+    const [rows, setRows] = useState(args.data);
+    const [editingRowKey, setEditingRowKey] = useState<string | null>(null);
+    return (
+      <VirtualGrid
+        {...args}
+        data={rows}
+        editingRowKey={editingRowKey}
+        onEditingRowKeyChange={setEditingRowKey}
+        onRowSave={(row) => {
+          setRows((prev) =>
+            prev.map((r) =>
+              String(r.id) === String(row.id) ? { ...r, ...row } : r,
+            ),
+          );
+          setEditingRowKey(null);
+        }}
+        onRowCancel={() => setEditingRowKey(null)}
+      />
+    );
+  },
+};
+
+export const RemotePagination: Story = {
+  args: {
+    columns,
+    data: makeRows(10),
+    pagination: true,
+    remote: true,
+    total: 95,
+    pageSize: 10,
+    height: 360,
+  },
+  render: function RemotePaginationStory(args) {
+    const pageSize = args.pageSize ?? 10;
+    const total = args.total ?? 95;
+    const [page, setPage] = useState(1);
+    const [loading, setLoading] = useState(false);
+    const [rows, setRows] = useState(() => makeRows(pageSize));
+
+    function loadPage(nextPage: number) {
+      setLoading(true);
+      setPage(nextPage);
+      window.setTimeout(() => {
+        const start = (nextPage - 1) * pageSize;
+        setRows(
+          Array.from({ length: pageSize }, (_, i) => {
+            const n = start + i + 1;
+            return {
+              id: String(n),
+              code: String(n).padStart(4, "0"),
+              name: `Name ${n}`,
+              fullName: `Full Name ${n}`,
+            };
+          }),
+        );
+        setLoading(false);
+      }, 350);
+    }
+
+    return (
+      <VirtualGrid
+        {...args}
+        data={rows}
+        total={total}
+        page={page}
+        pageSize={pageSize}
+        loading={loading}
+        onPageChange={loadPage}
+      />
+    );
   },
 };

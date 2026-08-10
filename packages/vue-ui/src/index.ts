@@ -22,6 +22,8 @@ export { VirtualGrid } from "./components/VirtualGrid";
 export type {
   VirtualGridColumn,
   VirtualGridCellContext,
+  VirtualGridCellChangePayload,
+  VirtualGridEditMode,
   VirtualGridHeaderContext,
   VirtualGridExpandContext,
 } from "./components/VirtualGrid";

@@ -411,3 +411,77 @@ describe("VirtualGrid (React) P4 tree / expandable", () => {
     expect(await screen.findByText("Loaded Child")).toBeInTheDocument();
   });
 });
+
+describe("VirtualGrid (React) P5 edit / remote", () => {
+  it("double-click cell → type → Enter → onCellChange called", async () => {
+    const user = userEvent.setup();
+    const onCellChange = vi.fn();
+    render(
+      <VirtualGrid
+        columns={[
+          { field: "id", title: "标识", width: 80, editable: false },
+          { field: "name", title: "名称", editable: true },
+        ]}
+        data={[{ id: "1", name: "Alpha" }]}
+        editable
+        onCellChange={onCellChange}
+      />,
+    );
+
+    await user.dblClick(screen.getByText("Alpha"));
+    const input = screen.getByDisplayValue("Alpha");
+    await user.clear(input);
+    await user.type(input, "Beta{Enter}");
+
+    expect(onCellChange).toHaveBeenCalledWith({
+      rowKey: "1",
+      field: "name",
+      value: "Beta",
+      row: { id: "1", name: "Alpha" },
+    });
+  });
+
+  it("row edit save calls onRowSave with updated values", async () => {
+    const user = userEvent.setup();
+    const onRowSave = vi.fn();
+    render(
+      <VirtualGrid
+        columns={[
+          { field: "id", title: "标识", width: 80, editable: false },
+          { field: "name", title: "名称", editable: true },
+        ]}
+        data={[{ id: "1", name: "Alpha" }]}
+        editable
+        editMode="row"
+        defaultEditingRowKey="1"
+        onRowSave={onRowSave}
+      />,
+    );
+
+    const input = screen.getByDisplayValue("Alpha");
+    await user.clear(input);
+    await user.type(input, "Gamma");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    expect(onRowSave).toHaveBeenCalledWith({ id: "1", name: "Gamma" });
+  });
+
+  it("remote+pagination does not slice and shows total", () => {
+    render(
+      <VirtualGrid
+        columns={columns}
+        data={makeRows(3)}
+        pagination
+        remote
+        total={100}
+        pageSize={2}
+      />,
+    );
+
+    // remote: data is the current page — do not locally slice to pageSize
+    expect(screen.getAllByRole("row")).toHaveLength(1 + 3);
+    expect(screen.getByText("Row 1")).toBeInTheDocument();
+    expect(screen.getByText("Row 3")).toBeInTheDocument();
+    expect(screen.getByText("共 100 条")).toBeInTheDocument();
+  });
+});

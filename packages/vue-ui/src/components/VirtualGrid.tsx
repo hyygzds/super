@@ -34,9 +34,22 @@ import {
   type PropType,
 } from "vue";
 import { Checkbox } from "./Checkbox";
+import { Input } from "./Input";
 import { Pagination } from "./Pagination";
 
-export type VirtualGridColumn = GridColumn;
+export type VirtualGridColumn = GridColumn & {
+  /** When set, overrides table-level `editable` for this column. */
+  editable?: boolean;
+};
+
+export type VirtualGridCellChangePayload = {
+  rowKey: string;
+  field: string;
+  value: string;
+  row: Record<string, unknown>;
+};
+
+export type VirtualGridEditMode = "cell" | "row";
 
 export type VirtualGridCellContext = {
   row: Record<string, unknown>;
@@ -401,6 +414,22 @@ export const VirtualGrid = defineComponent({
       type: Array as PropType<string[]>,
       default: () => [],
     },
+    editable: { type: Boolean, default: false },
+    editMode: {
+      type: String as PropType<VirtualGridEditMode>,
+      default: "cell",
+    },
+    editingRowKey: {
+      type: String as PropType<string | null | undefined>,
+      default: undefined,
+    },
+    defaultEditingRowKey: {
+      type: String as PropType<string | null>,
+      default: null,
+    },
+    remote: { type: Boolean, default: false },
+    total: { type: Number, default: undefined },
+    loading: { type: Boolean, default: false },
   },
   emits: {
     "update:selectedKeys": (_keys: string[]) => true,
@@ -408,6 +437,10 @@ export const VirtualGrid = defineComponent({
     "update:pageSize": (_pageSize: number) => true,
     "update:expandedKeys": (_keys: string[]) => true,
     "update:expandedRowKeys": (_keys: string[]) => true,
+    "update:editingRowKey": (_key: string | null) => true,
+    cellChange: (_payload: VirtualGridCellChangePayload) => true,
+    rowSave: (_row: Record<string, unknown>) => true,
+    rowCancel: (_rowKey: string) => true,
   },
   setup(props, { emit, slots }) {
     const scrollTop = ref(0);
@@ -424,10 +457,18 @@ export const VirtualGrid = defineComponent({
     const uncontrolledExpandedRowKeys = ref<string[]>(
       props.defaultExpandedRowKeys,
     );
+    const uncontrolledEditingRowKey = ref<string | null>(
+      props.defaultEditingRowKey,
+    );
     const childrenCache = ref(
       new Map<string, Record<string, unknown>[]>(),
     );
     const loadingKeys = ref(new Set<string>());
+
+    type CellEditState = { rowKey: string; field: string; draft: string };
+    const cellEdit = ref<CellEditState | null>(null);
+    const rowDraft = ref<Record<string, string>>({});
+    let skipCellBlurCommit = false;
 
     const selectedKeys = computed(
       () => props.selectedKeys ?? uncontrolledSelectedKeys.value,
@@ -441,6 +482,12 @@ export const VirtualGrid = defineComponent({
     );
     const expandedRowKeys = computed(
       () => props.expandedRowKeys ?? uncontrolledExpandedRowKeys.value,
+    );
+    const editingRowKey = computed(
+      () =>
+        props.editingRowKey !== undefined
+          ? props.editingRowKey
+          : uncontrolledEditingRowKey.value,
     );
 
     function commitSelectedKeys(next: string[]) {
@@ -458,6 +505,13 @@ export const VirtualGrid = defineComponent({
         uncontrolledExpandedRowKeys.value = next;
       }
       emit("update:expandedRowKeys", next);
+    }
+
+    function commitEditingRowKey(next: string | null) {
+      if (props.editingRowKey === undefined) {
+        uncontrolledEditingRowKey.value = next;
+      }
+      emit("update:editingRowKey", next);
     }
 
     function setPage(next: number) {
@@ -528,13 +582,19 @@ export const VirtualGrid = defineComponent({
     });
 
     const pagedBaseRows = computed(() =>
-      props.pagination
+      props.pagination && !props.remote
         ? slicePage(baseDisplayRows.value, {
             pageIndex: page.value,
             pageSize: pageSize.value,
             total: baseDisplayRows.value.length,
           })
         : baseDisplayRows.value,
+    );
+
+    const paginationTotal = computed(() =>
+      props.remote
+        ? (props.total ?? props.data.length)
+        : baseDisplayRows.value.length,
     );
 
     const pagedDisplayRows = computed((): BodyRow[] => {
@@ -777,17 +837,190 @@ export const VirtualGrid = defineComponent({
       commitSelectedKeys(toggleKey(selectedKeys.value, key, props.multiple));
     }
 
+    function isColumnEditable(column: VirtualGridColumn): boolean {
+      return (column.editable ?? props.editable) === true;
+    }
+
+    function cellValueString(row: Record<string, unknown>, field: string): string {
+      const value = row[field];
+      return value === undefined || value === null ? "" : String(value);
+    }
+
+    function beginCellEdit(
+      rowKey: string,
+      column: VirtualGridColumn,
+      row: Record<string, unknown>,
+    ) {
+      if (props.editMode !== "cell" || !isColumnEditable(column)) return;
+      cellEdit.value = {
+        rowKey,
+        field: column.field,
+        draft: cellValueString(row, column.field),
+      };
+    }
+
+    function commitCellEdit(row: Record<string, unknown>) {
+      const state = cellEdit.value;
+      if (!state) return;
+      emit("cellChange", {
+        rowKey: state.rowKey,
+        field: state.field,
+        value: state.draft,
+        row,
+      });
+      cellEdit.value = null;
+    }
+
+    function cancelCellEdit() {
+      skipCellBlurCommit = true;
+      cellEdit.value = null;
+      nextTick(() => {
+        skipCellBlurCommit = false;
+      });
+    }
+
+    function initRowDraft(row: Record<string, unknown>) {
+      const draft: Record<string, string> = {};
+      for (const col of leafColumns.value) {
+        if (!isColumnEditable(col)) continue;
+        draft[col.field] = cellValueString(row, col.field);
+      }
+      rowDraft.value = draft;
+    }
+
+    watch(
+      editingRowKey,
+      (key) => {
+        if (!key || props.editMode !== "row") {
+          rowDraft.value = {};
+          return;
+        }
+        const found = props.data.find(
+          (row, index) => rowKey(row, index) === key,
+        );
+        if (found) initRowDraft(found);
+      },
+      { immediate: true },
+    );
+
+    function saveRowEdit(row: Record<string, unknown>) {
+      const next = { ...row };
+      for (const [field, value] of Object.entries(rowDraft.value)) {
+        next[field] = value;
+      }
+      emit("rowSave", next);
+      rowDraft.value = {};
+      commitEditingRowKey(null);
+    }
+
+    function cancelRowEdit(key: string) {
+      rowDraft.value = {};
+      emit("rowCancel", key);
+      commitEditingRowKey(null);
+    }
+
     function renderDataCell(
       column: VirtualGridColumn,
       row: Record<string, unknown>,
       rowIndex: number,
+      key: string,
     ) {
       const value = row[column.field];
       const ctx: VirtualGridCellContext = { row, column, value, rowIndex };
       const fieldSlot = slots[`cell-${column.field}`];
       if (fieldSlot) return fieldSlot(ctx);
       if (slots.cell) return slots.cell(ctx);
+
+      const editable = isColumnEditable(column);
+      const isRowEditing =
+        props.editMode === "row" && editingRowKey.value === key && editable;
+      const isCellEditing =
+        props.editMode === "cell" &&
+        cellEdit.value?.rowKey === key &&
+        cellEdit.value?.field === column.field;
+
+      if (isRowEditing) {
+        return (
+          <div
+            class="w-full min-w-0"
+            onKeydown={(e: KeyboardEvent) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                cancelRowEdit(key);
+              }
+            }}
+          >
+            <Input
+              modelValue={rowDraft.value[column.field] ?? ""}
+              onUpdate:modelValue={(v: string) => {
+                rowDraft.value = { ...rowDraft.value, [column.field]: v };
+              }}
+            />
+          </div>
+        );
+      }
+
+      if (isCellEditing) {
+        return (
+          <div
+            class="w-full min-w-0"
+            onKeydown={(e: KeyboardEvent) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commitCellEdit(row);
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                cancelCellEdit();
+              }
+            }}
+          >
+            <Input
+              modelValue={cellEdit.value!.draft}
+              onUpdate:modelValue={(v: string) => {
+                if (cellEdit.value) {
+                  cellEdit.value = { ...cellEdit.value, draft: v };
+                }
+              }}
+              onBlur={() => {
+                if (skipCellBlurCommit) return;
+                commitCellEdit(row);
+              }}
+            />
+          </div>
+        );
+      }
+
       return String(value ?? "");
+    }
+
+    function renderRowEditActions(key: string, row: Record<string, unknown>) {
+      if (props.editMode !== "row" || editingRowKey.value !== key) return null;
+      return (
+        <span class="ml-1 inline-flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            aria-label="保存"
+            class="rounded px-1.5 py-0.5 text-xs text-sky-700 hover:bg-sky-50"
+            onClick={(e: MouseEvent) => {
+              e.stopPropagation();
+              saveRowEdit(row);
+            }}
+          >
+            保存
+          </button>
+          <button
+            type="button"
+            aria-label="取消"
+            class="rounded px-1.5 py-0.5 text-xs text-slate-600 hover:bg-slate-100"
+            onClick={(e: MouseEvent) => {
+              e.stopPropagation();
+              cancelRowEdit(key);
+            }}
+          >
+            取消
+          </button>
+        </span>
+      );
     }
 
     function renderHeaderCell(column: VirtualGridColumn) {
@@ -997,15 +1230,30 @@ export const VirtualGrid = defineComponent({
             }
             const isFirstDataCol = dataColIndex === 0;
             dataColIndex++;
+            const canEditCell =
+              props.editMode === "cell" && isColumnEditable(item.column);
             return (
               <div
                 key={item.column.field}
                 role="cell"
                 class={cellClass(props.autoHeight)}
                 style={stickyStyle(item, false, rowBg)}
+                onDblclick={
+                  canEditCell
+                    ? () => beginCellEdit(key, item.column, display.row)
+                    : undefined
+                }
               >
                 {renderRowLeading(display, isFirstDataCol)}
-                {renderDataCell(item.column, display.row, display.dataIndex)}
+                {isFirstDataCol
+                  ? renderRowEditActions(key, display.row)
+                  : null}
+                {renderDataCell(
+                  item.column,
+                  display.row,
+                  display.dataIndex,
+                  key,
+                )}
               </div>
             );
           })}
@@ -1123,6 +1371,8 @@ export const VirtualGrid = defineComponent({
           const sticky = layoutItem
             ? stickyStyle(layoutItem, false, rowBg)
             : undefined;
+          const canEditCell =
+            props.editMode === "cell" && isColumnEditable(column);
           rowCells.push(
             <div
               key={`${r}-${column.field}`}
@@ -1134,9 +1384,15 @@ export const VirtualGrid = defineComponent({
                 ...sticky,
                 background: sticky?.background ?? rowBg,
               }}
+              onDblclick={
+                canEditCell
+                  ? () => beginCellEdit(key, column, display.row)
+                  : undefined
+              }
             >
               {c === 0 ? renderRowLeading(display, true) : null}
-              {renderDataCell(column, display.row, display.dataIndex)}
+              {c === 0 ? renderRowEditActions(key, display.row) : null}
+              {renderDataCell(column, display.row, display.dataIndex, key)}
             </div>,
           );
         }
@@ -1303,6 +1559,16 @@ export const VirtualGrid = defineComponent({
               })}
             </div>
 
+            {props.loading ? (
+              <div
+                class="pointer-events-none absolute inset-x-0 top-0 z-[4] flex justify-center pt-2"
+                aria-busy="true"
+              >
+                <span class="rounded bg-white/90 px-2 py-1 text-xs text-slate-500 shadow-sm">
+                  加载中…
+                </span>
+              </div>
+            ) : null}
             {pagedDisplayRows.value.length === 0 ? (
               <div class="px-3 py-6 text-center text-slate-400">
                 {slots.empty?.() ?? props.emptyText}
@@ -1331,7 +1597,7 @@ export const VirtualGrid = defineComponent({
               }`}
             >
               <Pagination
-                total={baseDisplayRows.value.length}
+                total={paginationTotal.value}
                 page={page.value}
                 pageSize={pageSize.value}
                 pageSizeOptions={props.pageSizeOptions}

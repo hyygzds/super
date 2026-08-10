@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/vue3";
+import { ref } from "vue";
 import { VirtualGrid } from "./VirtualGrid";
 import type {
   VirtualGridCellContext,
@@ -377,4 +378,86 @@ export const ExpandRow: Story = {
       }}
     />
   ),
+};
+
+export const EditCell: Story = {
+  render: () => {
+    const rows = ref(makeRows(8));
+    return () => (
+      <VirtualGrid
+        columns={[
+          { field: "id", title: "标识", width: 80, editable: false },
+          { field: "code", title: "编号", width: 100 },
+          { field: "name", title: "名称", width: 140 },
+          { field: "fullName", title: "全称" },
+        ]}
+        data={rows.value}
+        editable
+        editMode="cell"
+        onCellChange={({ rowKey, field, value }) => {
+          rows.value = rows.value.map((r) =>
+            r.id === rowKey ? { ...r, [field]: value } : r,
+          );
+        }}
+      />
+    );
+  },
+};
+
+export const EditRow: Story = {
+  render: () => {
+    const rows = ref(makeRows(6));
+    const editingRowKey = ref<string | null>("1");
+    return () => (
+      <VirtualGrid
+        columns={[
+          { field: "id", title: "标识", width: 80, editable: false },
+          { field: "code", title: "编号", width: 100 },
+          { field: "name", title: "名称", width: 140 },
+          { field: "fullName", title: "全称" },
+        ]}
+        data={rows.value}
+        editable
+        editMode="row"
+        editingRowKey={editingRowKey.value}
+        onUpdate:editingRowKey={(key: string | null) => {
+          editingRowKey.value = key;
+        }}
+        onRowSave={(row) => {
+          rows.value = rows.value.map((r) =>
+            r.id === String(row.id) ? { ...r, ...row } : r,
+          );
+        }}
+      />
+    );
+  },
+};
+
+export const RemotePagination: Story = {
+  render: () => {
+    const all = makeRows(95);
+    const pageSize = 10;
+    const page = ref(1);
+    const loading = ref(false);
+    const slice = ref(all.slice(0, pageSize));
+    return () => (
+      <VirtualGrid
+        columns={columns}
+        data={slice.value}
+        pagination
+        remote
+        total={all.length}
+        page={page.value}
+        pageSize={pageSize}
+        loading={loading.value}
+        onUpdate:page={async (next: number) => {
+          loading.value = true;
+          page.value = next;
+          await new Promise((r) => setTimeout(r, 300));
+          slice.value = all.slice((next - 1) * pageSize, next * pageSize);
+          loading.value = false;
+        }}
+      />
+    );
+  },
 };

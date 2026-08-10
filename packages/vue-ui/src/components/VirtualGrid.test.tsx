@@ -408,3 +408,87 @@ describe("VirtualGrid (Vue) P4 tree / expandable", () => {
     expect(wrapper.text()).toContain("Loaded Child");
   });
 });
+
+describe("VirtualGrid (Vue) P5 edit / remote", () => {
+  it("emits cellChange when an editable cell is edited and committed", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: [
+          { field: "id", title: "标识", width: 80 },
+          { field: "name", title: "名称", editable: true },
+        ],
+        data: makeRows(2),
+        editable: true,
+        editMode: "cell",
+      },
+    });
+
+    const nameCell = wrapper
+      .findAll('[role="row"]')[1]
+      .findAll('[role="cell"]')
+      .find((c) => c.text().includes("Row 1"))!;
+    await nameCell.trigger("dblclick");
+
+    const input = wrapper.find("input");
+    expect(input.exists()).toBe(true);
+    await input.setValue("Updated");
+    await input.trigger("keydown", { key: "Enter" });
+
+    expect(wrapper.emitted("cellChange")?.[0]?.[0]).toEqual({
+      rowKey: "1",
+      field: "name",
+      value: "Updated",
+      row: { id: "1", name: "Row 1" },
+    });
+  });
+
+  it("emits rowSave with draft values when saving a row edit", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: [
+          { field: "id", title: "标识", width: 80, editable: false },
+          { field: "name", title: "名称" },
+        ],
+        data: makeRows(2),
+        editable: true,
+        editMode: "row",
+        defaultEditingRowKey: "1",
+      },
+    });
+
+    const input = wrapper.find("input");
+    expect(input.exists()).toBe(true);
+    await input.setValue("Saved Name");
+
+    await wrapper.find('button[aria-label="保存"]').trigger("click");
+
+    expect(wrapper.emitted("rowSave")?.[0]?.[0]).toEqual({
+      id: "1",
+      name: "Saved Name",
+    });
+    expect(wrapper.emitted("update:editingRowKey")?.[0]).toEqual([null]);
+  });
+
+  it("does not slice data when remote pagination is enabled", () => {
+    const pageData = makeRows(3).map((r, i) => ({
+      ...r,
+      id: String(i + 11),
+      name: `Remote ${i + 11}`,
+    }));
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns,
+        data: pageData,
+        pagination: true,
+        pageSize: 10,
+        remote: true,
+        total: 100,
+      },
+    });
+
+    expect(wrapper.findAll('[role="row"]')).toHaveLength(1 + 3);
+    expect(wrapper.text()).toContain("Remote 11");
+    expect(wrapper.text()).toContain("共 100 条");
+    expect(wrapper.text()).not.toContain("Row 1");
+  });
+});

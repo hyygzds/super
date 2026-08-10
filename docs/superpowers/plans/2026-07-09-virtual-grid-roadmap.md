@@ -27,7 +27,7 @@
 | 7 | [`2026-08-07-virtual-grid-p2.md`](./2026-08-07-virtual-grid-p2.md) | 模板、自动行高、固定列 | 依赖 5 |
 | 8 | [`2026-08-07-virtual-grid-p3.md`](./2026-08-07-virtual-grid-p3.md) | 表头/数据分组、合并单元格 | 依赖 5；扩展 grid-core |
 | 9 | [`2026-08-07-virtual-grid-p4.md`](./2026-08-07-virtual-grid-p4.md) | 树、异步加载、行扩展 | 依赖 5、3；扩展 grid-core |
-| 10 | *待写* `YYYY-MM-DD-virtual-grid-p5.md` | 编辑、远端分页 | 依赖 4、2、5 |
+| 10 | [`2026-08-10-virtual-grid-p5.md`](./2026-08-10-virtual-grid-p5.md) | 编辑、远端分页 | 依赖 4、2、5 |
 
 **规则（来自 spec §5）：** 凡表格依赖的 UI 组件，必须先作为完整库组件合入，再写「接到 VirtualGrid」的任务。
 
@@ -49,8 +49,9 @@
 5. 完成 [`2026-07-12-virtual-grid-p1.md`](./2026-07-12-virtual-grid-p1.md)（已完成，代码待 commit）
 6. [`2026-08-07-virtual-grid-p2.md`](./2026-08-07-virtual-grid-p2.md) 已执行
 7. [`2026-08-07-virtual-grid-p3.md`](./2026-08-07-virtual-grid-p3.md) 已执行
-8. [`2026-08-07-virtual-grid-p4.md`](./2026-08-07-virtual-grid-p4.md) 已执行（树 / 异步 / 行扩展）
-9. 用 writing-plans 写并执行 P5（编辑 / 远端分页）
+8. [`2026-08-07-virtual-grid-p4.md`](./2026-08-07-virtual-grid-p4.md) 已执行
+9. [`2026-08-10-virtual-grid-p5.md`](./2026-08-10-virtual-grid-p5.md) 已执行（编辑 / 远端分页）
+10. VirtualGrid P0–P5 已齐；剩余 Storybook 目视确认
 
 ---
 

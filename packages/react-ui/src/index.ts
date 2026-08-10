@@ -33,6 +33,7 @@ export type {
   VirtualGridProps,
   VirtualGridColumn,
   VirtualGridCellContext,
+  VirtualGridCellChangeInfo,
   VirtualGridHeaderContext,
   VirtualGridExpandedRowContext,
   GroupByConfig,
