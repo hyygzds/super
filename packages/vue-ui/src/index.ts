@@ -27,5 +27,10 @@ export type {
   VirtualGridHeaderContext,
   VirtualGridExpandContext,
 } from "./components/VirtualGrid";
-export { Form, FormItem } from "./components/Form";
-export type { FormProps, FormItemProps } from "./components/Form";
+export { Form, FormItem, FormList } from "./components/Form";
+export type {
+  FormProps,
+  FormItemProps,
+  FormListField,
+  FormListOperations,
+} from "./components/Form";

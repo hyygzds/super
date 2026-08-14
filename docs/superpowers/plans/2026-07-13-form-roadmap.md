@@ -21,6 +21,7 @@
 | 1 | [`2026-07-13-form-core-and-form.md`](./2026-07-13-form-core-and-form.md) | `@component-ai/form-core` + 双端 `Form` / `FormItem`（P0） | 无 |
 | 2 | [`2026-08-07-input-controls.md`](./2026-08-07-input-controls.md) | 双端 `Input` / `InputNumber` / `Textarea`（P1） | 建议在 Form 接线 Story 前；可与 1 部分并行，但完整 Form demo 依赖本项 |
 | 3 | [`2026-08-07-choice-controls.md`](./2026-08-07-choice-controls.md) | 双端 `Radio`/`RadioGroup` / `Switch` + Checkbox/Select 接入 Story（P2） | 依赖 1；控件本身可不依赖 Form，接入 Story 依赖 1 |
+| 4 | [`2026-08-14-form-p3-nested-list.md`](./2026-08-14-form-p3-nested-list.md) | 嵌套 NamePath、`Form.List`、`validateTrigger`、dependencies 重校验（P3） | 依赖 1 |
 
 **规则（来自 spec §5）：** 原子控件必须先作为完整库组件合入；Form 只消费公开 API。P0 可用原生 input 验证接线，P1 起 Story 改用库组件。
 
@@ -29,7 +30,7 @@
 ## form-core 演进策略
 
 - **Plan 1（P0）** 一次落地：字段注册、rules runner（含异步 validator）、blur/submit 触发、命令式 API 所需 store 方法。
-- 嵌套路径、schema 引擎等不在本 roadmap；若需要另开规格。
+- **Plan 4（P3）** 嵌套路径、List、触发策略与依赖重校验；schema 引擎仍不在本 roadmap。
 
 ---
 
@@ -37,10 +38,10 @@
 
 **P0 已完成**（[`2026-07-13-form-core-and-form.md`](./2026-07-13-form-core-and-form.md)）：`form-core` + 双端 Form/FormItem。  
 **P1 已完成**（[`2026-08-07-input-controls.md`](./2026-08-07-input-controls.md)）：双端 `Input` / `InputNumber` / `Textarea`。  
-**P2 已完成**（[`2026-08-07-choice-controls.md`](./2026-08-07-choice-controls.md)）：`Radio`/`RadioGroup` / `Switch`；FormItem `valuePropName` 接入 Checkbox/Switch；Select 接入 Story。
+**P2 已完成**（[`2026-08-07-choice-controls.md`](./2026-08-07-choice-controls.md)）：`Radio`/`RadioGroup` / `Switch`；FormItem `valuePropName` 接入 Checkbox/Switch；Select 接入 Story。  
+**P3 已完成**（规格 [`2026-08-14-form-p3-nested-list-design.md`](../specs/2026-08-14-form-p3-nested-list-design.md)，计划 [`2026-08-14-form-p3-nested-list.md`](./2026-08-14-form-p3-nested-list.md)）：嵌套路径、Form.List、validateTrigger、dependencies。
 
-1. Storybook 目视确认 Form P0–P2（需人工）
-2. 若有后续：嵌套路径 / 异步校验队列等另开规格
+1. Storybook 目视确认 Form P0–P3（需人工）
 
 ---
 
@@ -53,4 +54,4 @@
 
 ## 完成定义（整项）
 
-见规格 §12：P0–P2 全部完成、双端可演示、单测通过、依赖件均已完整导出。本 roadmap 全部子计划勾选完成即满足。
+见规格 §12（P0–P2）与 P3 规格完成定义：相关子计划完成、双端可演示、单测通过、依赖件均已完整导出。

@@ -146,4 +146,124 @@ describe("Form (React)", () => {
     expect(alert).toHaveTextContent("必填");
     expect(onFinish).not.toHaveBeenCalled();
   });
+
+  it("submits nested name paths as a nested values tree", async () => {
+    const user = userEvent.setup();
+    const onFinish = vi.fn();
+    render(
+      <Form
+        initialValues={{ user: { email: "" } }}
+        onFinish={onFinish}
+      >
+        <FormItem
+          name="user.email"
+          label="邮箱"
+          rules={[{ required: true, message: "必填" }]}
+        >
+          <input aria-label="邮箱" />
+        </FormItem>
+        <button type="submit">提交</button>
+      </Form>,
+    );
+    await user.type(screen.getByLabelText("邮箱"), "a@b.c");
+    await user.click(screen.getByRole("button", { name: "提交" }));
+    await waitFor(() =>
+      expect(onFinish).toHaveBeenCalledWith({ user: { email: "a@b.c" } }),
+    );
+  });
+
+  it("validates on change when validateTrigger includes change", async () => {
+    const user = userEvent.setup();
+    render(
+      <Form>
+        <FormItem
+          name="email"
+          label="邮箱"
+          validateTrigger="change"
+          rules={[{ minLength: 3, message: "太短" }]}
+        >
+          <input aria-label="邮箱" />
+        </FormItem>
+      </Form>,
+    );
+    await user.type(screen.getByLabelText("邮箱"), "ab");
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("太短");
+  });
+
+  it("revalidates when a dependency field changes", async () => {
+    const user = userEvent.setup();
+    render(
+      <Form initialValues={{ password: "secret", confirm: "nope" }}>
+        <FormItem name="password" label="密码">
+          <input aria-label="密码" />
+        </FormItem>
+        <FormItem
+          name="confirm"
+          label="确认"
+          dependencies={["password"]}
+          rules={[
+            {
+              validator: (value, values) =>
+                value === values.password ? true : "不一致",
+            },
+          ]}
+        >
+          <input aria-label="确认" />
+        </FormItem>
+      </Form>,
+    );
+    const confirm = screen.getByLabelText("确认");
+    await user.click(confirm);
+    await user.tab();
+    expect(await screen.findByRole("alert")).toHaveTextContent("不一致");
+    await user.clear(screen.getByLabelText("密码"));
+    await user.type(screen.getByLabelText("密码"), "nope");
+    await waitFor(() =>
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("Form.List add/remove manages array fields", async () => {
+    const user = userEvent.setup();
+    const onFinish = vi.fn();
+    render(
+      <Form initialValues={{ users: [{ name: "Ada" }] }} onFinish={onFinish}>
+        <Form.List name="users">
+          {(fields, { add, remove }) => (
+            <>
+              {fields.map((field) => (
+                <div key={field.key}>
+                  <FormItem name={[field.name, "name"]} label="姓名">
+                    <input aria-label={`姓名-${field.name}`} />
+                  </FormItem>
+                  <button
+                    type="button"
+                    onClick={() => remove(field.name)}
+                  >
+                    删除-{field.name}
+                  </button>
+                </div>
+              ))}
+              <button type="button" onClick={() => add({ name: "" })}>
+                添加
+              </button>
+            </>
+          )}
+        </Form.List>
+        <button type="submit">提交</button>
+      </Form>,
+    );
+    expect(screen.getByLabelText("姓名-0")).toHaveValue("Ada");
+    await user.click(screen.getByRole("button", { name: "添加" }));
+    expect(screen.getByLabelText("姓名-1")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("姓名-1"), "Grace");
+    await user.click(screen.getByRole("button", { name: "删除-0" }));
+    expect(screen.queryByLabelText("姓名-1")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("姓名-0")).toHaveValue("Grace");
+    await user.click(screen.getByRole("button", { name: "提交" }));
+    await waitFor(() =>
+      expect(onFinish).toHaveBeenCalledWith({ users: [{ name: "Grace" }] }),
+    );
+  });
 });

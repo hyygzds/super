@@ -14,13 +14,17 @@ import {
 } from "vue";
 import {
   createFormStore,
+  joinNamePath,
+  normalizeNamePath,
   type FormRule,
   type FormStore,
   type FormValues,
+  type NamePath,
   type ValidateResult,
 } from "@component-ai/form-core";
 
 type FormLayout = "vertical" | "horizontal";
+type ValidateTrigger = "blur" | "change";
 
 type FormContext = {
   store: FormStore;
@@ -30,7 +34,14 @@ type FormContext = {
   tick: Ref<number>;
 };
 
+type FormListContext = {
+  listName: NamePath;
+};
+
 const FORM_KEY: InjectionKey<FormContext> = Symbol("component-ai-form");
+const FORM_LIST_KEY: InjectionKey<FormListContext> = Symbol(
+  "component-ai-form-list",
+);
 
 function readChangeValue(eventOrValue: unknown): unknown {
   if (
@@ -46,6 +57,22 @@ function readChangeValue(eventOrValue: unknown): unknown {
   return eventOrValue;
 }
 
+function normalizeTriggers(
+  trigger: ValidateTrigger | ValidateTrigger[] | undefined,
+): ValidateTrigger[] {
+  if (trigger === undefined) return ["blur"];
+  return Array.isArray(trigger) ? trigger : [trigger];
+}
+
+function resolveFieldName(
+  name: NamePath | undefined,
+  listCtx: FormListContext | undefined,
+): string | undefined {
+  if (name === undefined || name === null || name === "") return undefined;
+  if (listCtx) return joinNamePath(listCtx.listName, name);
+  return normalizeNamePath(name);
+}
+
 export type FormProps = {
   initialValues?: FormValues;
   layout?: FormLayout;
@@ -59,7 +86,7 @@ export type FormProps = {
   class?: string;
 };
 
-export const Form = defineComponent({
+export const FormRoot = defineComponent({
   name: "Form",
   props: {
     initialValues: Object as PropType<FormValues>,
@@ -85,17 +112,26 @@ export const Form = defineComponent({
     });
 
     const layout = ref(props.layout);
-    watch(() => props.layout, (next) => {
-      layout.value = next;
-    });
+    watch(
+      () => props.layout,
+      (next) => {
+        layout.value = next;
+      },
+    );
     const labelWidth = ref(props.labelWidth);
-    watch(() => props.labelWidth, (next) => {
-      labelWidth.value = next;
-    });
+    watch(
+      () => props.labelWidth,
+      (next) => {
+        labelWidth.value = next;
+      },
+    );
     const disabled = ref(props.disabled);
-    watch(() => props.disabled, (next) => {
-      disabled.value = next;
-    });
+    watch(
+      () => props.disabled,
+      (next) => {
+        disabled.value = next;
+      },
+    );
 
     provide(FORM_KEY, {
       store,
@@ -111,12 +147,12 @@ export const Form = defineComponent({
 
     expose({
       validate: runValidate,
-      validateFields: (names?: string[]) => store.validateFields(names),
+      validateFields: (names?: NamePath[]) => store.validateFields(names),
       getFieldsValue: () => store.getFieldsValue(),
       setFieldsValue: (values: Partial<FormValues>) =>
         store.setFieldsValue(values),
-      resetFields: (names?: string[]) => store.resetFields(names),
-      clearValidate: (names?: string[]) => store.clearValidate(names),
+      resetFields: (names?: NamePath[]) => store.resetFields(names),
+      clearValidate: (names?: NamePath[]) => store.clearValidate(names),
     });
 
     async function onSubmit(event: Event) {
@@ -132,13 +168,6 @@ export const Form = defineComponent({
       }
     }
 
-    // Form's own render must NOT depend on `tick`: FormItem already
-    // subscribes to `tick` directly via inject(), so it re-renders itself
-    // whenever the store notifies. If Form also depended on `tick` here,
-    // every store update would re-run `slots.default()`, producing fresh
-    // vnodes/prop literals (e.g. a new `rules` array) for FormItem, which
-    // in turn retriggers FormItem's `watch(() => props.rules, ...)` and
-    // calls `updateFieldRules` -> `notify()` -> infinite render loop.
     return () => (
       <form
         class={["flex flex-col gap-4", props.class].filter(Boolean).join(" ")}
@@ -151,15 +180,93 @@ export const Form = defineComponent({
   },
 });
 
+export type FormListField = {
+  key: number;
+  name: number;
+};
+
+export type FormListOperations = {
+  add: (defaultValue?: unknown) => void;
+  remove: (index: number) => void;
+};
+
+export const FormList = defineComponent({
+  name: "FormList",
+  props: {
+    name: {
+      type: [String, Array] as PropType<NamePath>,
+      required: true,
+    },
+  },
+  setup(props, { slots }) {
+    const ctx = inject(FORM_KEY);
+    if (!ctx) throw new Error("Form.List must be used inside Form");
+    const store = ctx.store;
+
+    const listKey = normalizeNamePath(props.name);
+    provide(FORM_LIST_KEY, { listName: listKey });
+
+    let keySeed = 0;
+    const keys = ref<number[]>([]);
+
+    function syncKeys(length: number) {
+      if (keys.value.length === length) return;
+      if (keys.value.length < length) {
+        const next = [...keys.value];
+        while (next.length < length) {
+          keySeed += 1;
+          next.push(keySeed);
+        }
+        keys.value = next;
+        return;
+      }
+      keys.value = keys.value.slice(0, length);
+    }
+
+    const initial = store.getFieldValue(listKey);
+    syncKeys(Array.isArray(initial) ? initial.length : 0);
+
+    function add(defaultValue: unknown = {}) {
+      const current = store.getFieldValue(listKey);
+      const arr = Array.isArray(current) ? [...current] : [];
+      arr.push(defaultValue);
+      keySeed += 1;
+      keys.value = [...keys.value, keySeed];
+      store.setFieldValue(listKey, arr);
+    }
+
+    function remove(index: number) {
+      const current = store.getFieldValue(listKey);
+      if (!Array.isArray(current)) return;
+      const arr = current.filter((_, i) => i !== index);
+      keys.value = keys.value.filter((_, i) => i !== index);
+      store.setFieldValue(listKey, arr);
+    }
+
+    return () => {
+      void ctx.tick.value;
+      const listValue = store.getFieldValue(listKey);
+      const length = Array.isArray(listValue) ? listValue.length : 0;
+      syncKeys(length);
+      const fields: FormListField[] = Array.from({ length }, (_, index) => ({
+        key: keys.value[index] ?? index,
+        name: index,
+      }));
+      return slots.default?.({ fields, add, remove }) ?? null;
+    };
+  },
+});
+
 export type FormItemProps = {
-  name?: string;
+  name?: NamePath;
   label?: string;
   rules?: FormRule[];
   required?: boolean;
   help?: string;
   class?: string;
-  /** Use `"checked"` for Checkbox/Switch (maps to boolean `modelValue`). */
   valuePropName?: string;
+  validateTrigger?: ValidateTrigger | ValidateTrigger[];
+  dependencies?: NamePath[];
 };
 
 let formItemSeq = 0;
@@ -167,24 +274,34 @@ let formItemSeq = 0;
 export const FormItem = defineComponent({
   name: "FormItem",
   props: {
-    name: String,
+    name: [String, Array] as PropType<NamePath>,
     label: String,
     rules: Array as PropType<FormRule[]>,
     required: { type: Boolean, default: false },
     help: String,
     class: { type: String, default: "" },
     valuePropName: { type: String, default: "value" },
+    validateTrigger: [String, Array] as PropType<
+      ValidateTrigger | ValidateTrigger[]
+    >,
+    dependencies: Array as PropType<NamePath[]>,
   },
   setup(props, { slots }) {
     const ctx = inject(FORM_KEY);
     if (!ctx) throw new Error("FormItem must be used inside Form");
+    const listCtx = inject(FORM_LIST_KEY, undefined);
 
     const seq = ++formItemSeq;
     const controlId = `form-vue-${seq}-control`;
     const errorId = `form-vue-${seq}-error`;
 
+    function currentFieldName(): string | undefined {
+      return resolveFieldName(props.name, listCtx);
+    }
+
     onMounted(() => {
-      if (!props.name) {
+      const fieldName = currentFieldName();
+      if (!fieldName) {
         if (
           (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process
             ?.env?.NODE_ENV === "development"
@@ -193,25 +310,40 @@ export const FormItem = defineComponent({
         }
         return;
       }
-      ctx.store.registerField(props.name, { rules: props.rules });
+      ctx.store.registerField(fieldName, {
+        rules: props.rules,
+        dependencies: props.dependencies,
+      });
     });
 
     onBeforeUnmount(() => {
-      if (props.name) ctx.store.unregisterField(props.name);
+      const fieldName = currentFieldName();
+      if (fieldName) ctx.store.unregisterField(fieldName);
     });
 
     watch(
       () => props.rules,
       (rules) => {
-        if (props.name) ctx.store.updateFieldRules(props.name, rules);
+        const fieldName = currentFieldName();
+        if (fieldName) ctx.store.updateFieldRules(fieldName, rules);
+      },
+    );
+
+    watch(
+      () => props.dependencies,
+      (dependencies) => {
+        const fieldName = currentFieldName();
+        if (fieldName) ctx.store.updateFieldDependencies(fieldName, dependencies);
       },
     );
 
     return () => {
       void ctx.tick.value;
-      const errors = props.name ? ctx.store.getFieldErrors(props.name) : [];
+      const fieldName = currentFieldName();
+      const triggers = normalizeTriggers(props.validateTrigger);
+      const errors = fieldName ? ctx.store.getFieldErrors(fieldName) : [];
       const showError = errors[0];
-      const value = props.name ? ctx.store.getFieldValue(props.name) : undefined;
+      const value = fieldName ? ctx.store.getFieldValue(fieldName) : undefined;
 
       const raw = slots.default?.() ?? [];
       const first = raw.find((n) => n && typeof n.type !== "symbol") as
@@ -226,11 +358,20 @@ export const FormItem = defineComponent({
       const isCheckControl = props.valuePropName === "checked";
 
       const syncValue = (eventOrValue: unknown) => {
-        if (!props.name) return;
+        if (!fieldName) return;
         const next = isCheckControl
           ? Boolean(eventOrValue)
           : readChangeValue(eventOrValue);
-        ctx.store.setFieldValue(props.name, next);
+        ctx.store.setFieldValue(fieldName, next);
+        if (triggers.includes("change")) {
+          void ctx.store.validateField(fieldName);
+        }
+      };
+
+      const onBlur = () => {
+        if (fieldName && triggers.includes("blur")) {
+          void ctx.store.validateField(fieldName);
+        }
       };
 
       const controlValue = isCheckControl
@@ -244,19 +385,15 @@ export const FormItem = defineComponent({
         isCheckControl
           ? {
               id: controlId,
-              // Do not overwrite Checkbox's string `value` option prop.
               modelValue: controlValue,
               disabled: childDisabled,
               "aria-invalid": showError ? true : undefined,
               "aria-describedby": showError ? errorId : undefined,
               "onUpdate:modelValue": syncValue,
-              onBlur: () => {
-                if (props.name) void ctx.store.validateField(props.name);
-              },
+              onBlur,
             }
           : {
               id: controlId,
-              // Keep null for InputNumber empty; only coerce missing values to "".
               value: controlValue,
               modelValue: controlValue,
               disabled: childDisabled,
@@ -265,9 +402,7 @@ export const FormItem = defineComponent({
               onInput: syncValue,
               onChange: syncValue,
               "onUpdate:modelValue": syncValue,
-              onBlur: () => {
-                if (props.name) void ctx.store.validateField(props.name);
-              },
+              onBlur,
             },
       );
 
@@ -328,3 +463,5 @@ export const FormItem = defineComponent({
     };
   },
 });
+
+export const Form = Object.assign(FormRoot, { List: FormList });

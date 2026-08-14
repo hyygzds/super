@@ -8,7 +8,9 @@ import {
   useEffect,
   useId,
   useImperativeHandle,
+  useMemo,
   useRef,
+  useState,
   useSyncExternalStore,
   type FormEvent,
   type ReactElement,
@@ -16,9 +18,12 @@ import {
 } from "react";
 import {
   createFormStore,
+  joinNamePath,
+  normalizeNamePath,
   type FormRule,
   type FormStore,
   type FormValues,
+  type NamePath,
   type ValidateResult,
 } from "@component-ai/form-core";
 
@@ -31,7 +36,12 @@ type FormContextValue = {
   disabled: boolean;
 };
 
+type FormListContextValue = {
+  listName: NamePath;
+};
+
 const FormContext = createContext<FormContextValue | null>(null);
+const FormListContext = createContext<FormListContextValue | null>(null);
 
 function useFormContext(component: string) {
   const ctx = useContext(FormContext);
@@ -39,13 +49,24 @@ function useFormContext(component: string) {
   return ctx;
 }
 
+function resolveFieldName(
+  name: NamePath | undefined,
+  listCtx: FormListContextValue | null,
+): string | undefined {
+  if (name === undefined || name === null || name === "") return undefined;
+  if (listCtx) {
+    return joinNamePath(listCtx.listName, name);
+  }
+  return normalizeNamePath(name);
+}
+
 export type FormHandle = {
   validate: () => Promise<ValidateResult>;
-  validateFields: (names?: string[]) => Promise<ValidateResult>;
+  validateFields: (names?: NamePath[]) => Promise<ValidateResult>;
   getFieldsValue: () => FormValues;
   setFieldsValue: (values: Partial<FormValues>) => void;
-  resetFields: (names?: string[]) => void;
-  clearValidate: (names?: string[]) => void;
+  resetFields: (names?: NamePath[]) => void;
+  clearValidate: (names?: NamePath[]) => void;
 };
 
 export type FormProps = {
@@ -62,7 +83,16 @@ export type FormProps = {
   children?: ReactNode;
 };
 
-export const Form = forwardRef<FormHandle, FormProps>(function Form(
+type ValidateTrigger = "blur" | "change";
+
+function normalizeTriggers(
+  trigger: ValidateTrigger | ValidateTrigger[] | undefined,
+): ValidateTrigger[] {
+  if (trigger === undefined) return ["blur"];
+  return Array.isArray(trigger) ? trigger : [trigger];
+}
+
+const FormRoot = forwardRef<FormHandle, FormProps>(function Form(
   {
     initialValues,
     layout = "vertical",
@@ -111,8 +141,92 @@ export const Form = forwardRef<FormHandle, FormProps>(function Form(
   );
 });
 
+export type FormListField = {
+  key: number;
+  name: number;
+};
+
+export type FormListOperations = {
+  add: (defaultValue?: unknown) => void;
+  remove: (index: number) => void;
+};
+
+export type FormListProps = {
+  name: NamePath;
+  children: (
+    fields: FormListField[],
+    operations: FormListOperations,
+  ) => ReactNode;
+};
+
+export function FormList({ name, children }: FormListProps) {
+  const { store } = useFormContext("Form.List");
+  useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+  const listKey = normalizeNamePath(name);
+  const keySeed = useRef(0);
+  const [keys, setKeys] = useState<number[]>(() => {
+    const initial = store.getFieldValue(listKey);
+    const len = Array.isArray(initial) ? initial.length : 0;
+    return Array.from({ length: len }, () => {
+      keySeed.current += 1;
+      return keySeed.current;
+    });
+  });
+
+  const listValue = store.getFieldValue(listKey);
+  const length = Array.isArray(listValue) ? listValue.length : 0;
+
+  useEffect(() => {
+    setKeys((prev) => {
+      if (prev.length === length) return prev;
+      if (prev.length < length) {
+        const next = [...prev];
+        while (next.length < length) {
+          keySeed.current += 1;
+          next.push(keySeed.current);
+        }
+        return next;
+      }
+      return prev.slice(0, length);
+    });
+  }, [length]);
+
+  const fields: FormListField[] = useMemo(
+    () =>
+      Array.from({ length }, (_, index) => ({
+        key: keys[index] ?? index,
+        name: index,
+      })),
+    [length, keys],
+  );
+
+  const operations: FormListOperations = {
+    add(defaultValue = {}) {
+      const current = store.getFieldValue(listKey);
+      const arr = Array.isArray(current) ? [...current] : [];
+      arr.push(defaultValue);
+      keySeed.current += 1;
+      setKeys((prev) => [...prev, keySeed.current]);
+      store.setFieldValue(listKey, arr);
+    },
+    remove(index: number) {
+      const current = store.getFieldValue(listKey);
+      if (!Array.isArray(current)) return;
+      const arr = current.filter((_, i) => i !== index);
+      setKeys((prev) => prev.filter((_, i) => i !== index));
+      store.setFieldValue(listKey, arr);
+    },
+  };
+
+  return (
+    <FormListContext.Provider value={{ listName: listKey }}>
+      {children(fields, operations)}
+    </FormListContext.Provider>
+  );
+}
+
 export type FormItemProps = {
-  name?: string;
+  name?: NamePath;
   label?: string;
   rules?: FormRule[];
   required?: boolean;
@@ -123,6 +237,8 @@ export type FormItemProps = {
   valuePropName?: string;
   /** Event prop that receives the next value. Use `"onCheckedChange"` for Checkbox/Switch. */
   trigger?: string;
+  validateTrigger?: ValidateTrigger | ValidateTrigger[];
+  dependencies?: NamePath[];
   children: ReactElement;
 };
 
@@ -150,15 +266,20 @@ export function FormItem({
   className = "",
   valuePropName = "value",
   trigger = "onChange",
+  validateTrigger,
+  dependencies,
   children,
 }: FormItemProps) {
   const { store, layout, labelWidth, disabled } = useFormContext("FormItem");
+  const listCtx = useContext(FormListContext);
+  const fieldName = resolveFieldName(name, listCtx);
+  const triggers = normalizeTriggers(validateTrigger);
   const reactId = useId().replace(/:/g, "");
   const controlId = `form-${reactId}-control`;
   const errorId = `form-${reactId}-error`;
 
   useEffect(() => {
-    if (!name) {
+    if (!fieldName) {
       if (
         (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process
           ?.env?.NODE_ENV === "development"
@@ -167,18 +288,23 @@ export function FormItem({
       }
       return;
     }
-    store.registerField(name, { rules });
-    return () => store.unregisterField(name);
+    store.registerField(fieldName, { rules, dependencies });
+    return () => store.unregisterField(fieldName);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, store]);
+  }, [fieldName, store]);
 
   useEffect(() => {
-    if (!name) return;
-    store.updateFieldRules(name, rules);
-  }, [name, rules, store]);
+    if (!fieldName) return;
+    store.updateFieldRules(fieldName, rules);
+  }, [fieldName, rules, store]);
 
-  const errors = name ? store.getFieldErrors(name) : [];
-  const value = name ? store.getFieldValue(name) : undefined;
+  useEffect(() => {
+    if (!fieldName) return;
+    store.updateFieldDependencies(fieldName, dependencies);
+  }, [fieldName, dependencies, store]);
+
+  const errors = fieldName ? store.getFieldErrors(fieldName) : [];
+  const value = fieldName ? store.getFieldValue(fieldName) : undefined;
   const showError = errors[0];
 
   if (!isValidElement(children)) {
@@ -195,11 +321,14 @@ export function FormItem({
       : value;
 
   const handleTrigger = (eventOrValue: unknown) => {
-    if (!name) return;
+    if (!fieldName) return;
     const next = isCheckControl
       ? Boolean(eventOrValue)
       : readChangeValue(eventOrValue);
-    store.setFieldValue(name, next);
+    store.setFieldValue(fieldName, next);
+    if (triggers.includes("change")) {
+      void store.validateField(fieldName);
+    }
     const childTrigger = child.props[trigger] as
       | ((v: unknown) => void)
       | undefined;
@@ -214,7 +343,9 @@ export function FormItem({
     "aria-describedby": showError ? errorId : undefined,
     [trigger]: handleTrigger,
     onBlur: (event: unknown) => {
-      if (name) void store.validateField(name);
+      if (fieldName && triggers.includes("blur")) {
+        void store.validateField(fieldName);
+      }
       const childOnBlur = child.props.onBlur as ((e: unknown) => void) | undefined;
       childOnBlur?.(event);
     },
@@ -270,3 +401,5 @@ export function FormItem({
     </div>
   );
 }
+
+export const Form = Object.assign(FormRoot, { List: FormList });

@@ -96,4 +96,45 @@ describe("createFormStore", () => {
     await p;
     expect(store.isFieldValidating("n")).toBe(false);
   });
+
+  it("reads and writes nested paths in values tree", async () => {
+    const store = createFormStore({
+      initialValues: { user: { email: "a@b.c" } },
+    });
+    store.registerField("user.email", {
+      rules: [{ required: true, message: "必填" }],
+    });
+    expect(store.getFieldValue("user.email")).toBe("a@b.c");
+    store.setFieldValue("user.email", "x@y.z");
+    expect(store.getFieldsValue()).toEqual({ user: { email: "x@y.z" } });
+    store.setFieldValue(["users", 0, "name"], "Ada");
+    expect(store.getFieldValue("users.0.name")).toBe("Ada");
+    expect(store.getFieldsValue()).toEqual({
+      user: { email: "x@y.z" },
+      users: [{ name: "Ada" }],
+    });
+    expect(await store.validateField("user.email")).toBe(true);
+  });
+
+  it("revalidates fields that list a changed dependency", async () => {
+    const store = createFormStore({
+      initialValues: { password: "secret", confirm: "nope" },
+    });
+    store.registerField("password");
+    store.registerField("confirm", {
+      dependencies: ["password"],
+      rules: [
+        {
+          validator: (value, values) =>
+            value === values.password ? true : "不一致",
+        },
+      ],
+    });
+    await store.validateField("confirm");
+    expect(store.getFieldErrors("confirm")).toEqual(["不一致"]);
+    store.setFieldValue("password", "nope");
+    await vi.waitFor(() =>
+      expect(store.getFieldErrors("confirm")).toEqual([]),
+    );
+  });
 });
