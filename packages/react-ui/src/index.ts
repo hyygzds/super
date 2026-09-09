@@ -41,6 +41,8 @@ export type {
 } from "./components/VirtualGrid";
 export { Form, FormItem } from "./components/Form";
 export type { FormProps, FormItemProps, FormHandle } from "./components/Form";
+export { Transfer } from "./components/Transfer";
+export type { TransferProps, TransferItem } from "./components/Transfer";
 export { Input } from "./components/Input";
 export type { InputProps } from "./components/Input";
 export { InputNumber } from "./components/InputNumber";

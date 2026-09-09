@@ -12,8 +12,10 @@
 super-component/
 ├── packages/
 │   ├── grid-core/     # 框架无关的纯 TS 核心：虚拟窗口、分页切片、选中状态机
+│   ├── form-core/     # 框架无关的纯 TS 核心：字段注册、rules、嵌套路径
 │   ├── react-ui/      # @component-ai/react-ui —— React 组件 + Tailwind
-│   └── vue-ui/        # @component-ai/vue-ui —— Vue 3 组件 + Tailwind
+│   ├── vue-ui/        # @component-ai/vue-ui —— Vue 3 组件 + Tailwind
+│   └── ai-chat/       # @component-ai/ai-chat —— React useChat + Chat UI
 ├── apps/
 │   ├── storybook-react/  # React Storybook（端口 6006）
 │   └── storybook-vue/    # Vue Storybook（端口 6007）
@@ -22,7 +24,7 @@ super-component/
     └── superpowers/plans/   # 实现计划（怎么做，含 TDD 步骤 + checkbox）
 ```
 
-npm workspaces：`packages/*` + `apps/*`。三个包互相独立发布/构建，`react-ui`/`vue-ui` 都依赖 `grid-core`（`dependencies`，非 peer）。
+npm workspaces：`packages/*` + `apps/*`。核心包与 UI 包独立发布/构建；`react-ui`/`vue-ui` 依赖 `grid-core` 与 `form-core`（`dependencies`，非 peer）。`ai-chat` 仅 React。
 
 ### 架构选型：共享核心 + 双端薄适配
 
@@ -38,11 +40,17 @@ npm workspaces：`packages/*` + `apps/*`。三个包互相独立发布/构建，
 | `Button` | ✅ | ✅ | |
 | `Select` | ✅ | ✅ | |
 | `Tabs` / `TabsList` / `TabsTrigger` / `TabsPanel` | ✅ | ✅ | |
-| `Pagination` | ✅ | ✅ | 受控/非受控双模式；`grid-core` 的 `normalizePageSlice` |
+| `Pagination` | ✅ | ✅ | 受控/非受控；`grid-core` 的 `normalizePageSlice` |
 | `Checkbox` | ✅ | ✅ | 受控/非受控 + `indeterminate` |
-| `VirtualGrid` | ✅（P0+P1） | ✅（P0+P1） | 基础表 + 纵向虚拟滚动 + 选中 + 本地分页；分期迁移中，见下 |
+| `Radio` / `RadioGroup` | ✅ | ✅ | |
+| `Switch` | ✅ | ✅ | |
+| `Input` / `InputNumber` / `Textarea` | ✅ | ✅ | |
+| `Form` / `FormItem` | ✅ | ✅ | P0–P2 在 master；P3 嵌套路径 / `Form.List` 见 PR #2 |
+| `Transfer` | ✅ | ✅ | 穿梭框；规格 [`2026-09-09-transfer-design.md`](docs/superpowers/specs/2026-09-09-transfer-design.md) |
+| `VirtualGrid` | ✅（P0–P5） | ✅（P0–P5） | 基础表、虚拟滚动、选中、分页、模板/行高/固定列、分组/合并、树/展开、编辑/远端分页 |
+| `Chat`（`@component-ai/ai-chat`） | ✅ | — | 仅 React：`useChat` + 流式 UI |
 
-`VirtualGrid` 是全仓库最大的迁移目标，按 P0–P5 分期（P0 基础表+虚拟滚动、P1 选中+分页 已完成；P2 模板/自动行高/固定列、P3 分组/合并、P4 树/懒加载、P5 编辑/远端分页 未开始）。分期与依赖关系见 [`docs/superpowers/plans/2026-07-09-virtual-grid-roadmap.md`](docs/superpowers/plans/2026-07-09-virtual-grid-roadmap.md)。
+`VirtualGrid` P0–P5 代码已在 master；路线图见 [`docs/superpowers/plans/2026-07-09-virtual-grid-roadmap.md`](docs/superpowers/plans/2026-07-09-virtual-grid-roadmap.md)。Form 见 [`docs/superpowers/plans/2026-07-13-form-roadmap.md`](docs/superpowers/plans/2026-07-13-form-roadmap.md)。
 
 组件源码位置：`packages/{react-ui,vue-ui}/src/components/*.tsx`；同目录放 `*.test.tsx` 和 `*.stories.tsx`。两端导出清单见各包的 `src/index.ts`。
 
