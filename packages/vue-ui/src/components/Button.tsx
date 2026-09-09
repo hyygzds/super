@@ -1,4 +1,4 @@
-import { computed, defineComponent, type PropType } from "vue";
+import { computed, defineComponent, mergeProps, type PropType } from "vue";
 
 type ButtonVariant = "primary" | "secondary" | "ghost";
 
@@ -13,6 +13,7 @@ const variantMap: Record<ButtonVariant, string> = {
 
 export default defineComponent({
   name: "Button",
+  inheritAttrs: false,
   props: {
     variant: {
       type: String as PropType<ButtonVariant>,
@@ -23,17 +24,24 @@ export default defineComponent({
       type: String as PropType<HTMLButtonElement["type"]>,
       default: "button",
     },
+    onClick: Function as PropType<(event: MouseEvent) => void>,
   },
-  setup(props, { slots }) {
+  setup(props, { slots, attrs }) {
     const base =
       "inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50";
     const variantClass = computed(() => variantMap[props.variant]);
 
     return () => (
       <button
-        type={props.type}
-        disabled={props.disabled}
-        class={`${base} ${variantClass.value}`}
+        {...mergeProps(
+          {
+            type: props.type,
+            disabled: props.disabled,
+            class: `${base} ${variantClass.value}`,
+            onClick: props.onClick,
+          },
+          attrs,
+        )}
       >
         {slots.default?.()}
       </button>
