@@ -48,6 +48,8 @@ export type {
   FormListField,
   FormListOperations,
 } from "./components/Form";
+export { Transfer } from "./components/Transfer";
+export type { TransferProps, TransferItem } from "./components/Transfer";
 export { Input } from "./components/Input";
 export type { InputProps } from "./components/Input";
 export { InputNumber } from "./components/InputNumber";
