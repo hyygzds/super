@@ -39,8 +39,15 @@ export type {
   GroupByConfig,
   SpanMethod,
 } from "./components/VirtualGrid";
-export { Form, FormItem } from "./components/Form";
-export type { FormProps, FormItemProps, FormHandle } from "./components/Form";
+export { Form, FormItem, FormList } from "./components/Form";
+export type {
+  FormProps,
+  FormItemProps,
+  FormHandle,
+  FormListProps,
+  FormListField,
+  FormListOperations,
+} from "./components/Form";
 export { Transfer } from "./components/Transfer";
 export type { TransferProps, TransferItem } from "./components/Transfer";
 export { Input } from "./components/Input";

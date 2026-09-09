@@ -45,7 +45,7 @@ npm workspaces：`packages/*` + `apps/*`。核心包与 UI 包独立发布/构�
 | `Radio` / `RadioGroup` | ✅ | ✅ | |
 | `Switch` | ✅ | ✅ | |
 | `Input` / `InputNumber` / `Textarea` | ✅ | ✅ | |
-| `Form` / `FormItem` | ✅ | ✅ | P0–P2 在 master；P3 嵌套路径 / `Form.List` 见 PR #2 |
+| `Form` / `FormItem` / `Form.List` | ✅ | ✅ | P0–P3：嵌套路径、`Form.List`、`validateTrigger` |
 | `Transfer` | ✅ | ✅ | 穿梭框；规格 [`2026-09-09-transfer-design.md`](docs/superpowers/specs/2026-09-09-transfer-design.md) |
 | `VirtualGrid` | ✅（P0–P5） | ✅（P0–P5） | 基础表、虚拟滚动、选中、分页、模板/行高/固定列、分组/合并、树/展开、编辑/远端分页 |
 | `Chat`（`@component-ai/ai-chat`） | ✅ | — | 仅 React：`useChat` + 流式 UI |

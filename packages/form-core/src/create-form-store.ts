@@ -1,4 +1,11 @@
 import { runRules } from "./run-rules";
+import {
+  getValueAtPath,
+  normalizeNamePath,
+  parseNamePath,
+  setValueAtPath,
+  type NamePath,
+} from "./name-path";
 import type { FormRule, FormValues, ValidateResult } from "./types";
 
 export type CreateFormStoreOptions = {
@@ -9,34 +16,76 @@ type FieldMeta = {
   rules: FormRule[];
   errors: string[];
   validating: boolean;
+  dependencies: string[];
 };
 
+function cloneValues<T>(value: T): T {
+  if (value instanceof Date) {
+    return new Date(value.getTime()) as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => cloneValues(item)) as T;
+  }
+  if (value !== null && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, nested] of Object.entries(
+      value as Record<string, unknown>,
+    )) {
+      out[key] = cloneValues(nested);
+    }
+    return out as T;
+  }
+  return value;
+}
+
 export type FormStore = {
-  registerField: (name: string, options?: { rules?: FormRule[] }) => void;
-  unregisterField: (name: string) => void;
-  updateFieldRules: (name: string, rules: FormRule[] | undefined) => void;
-  getFieldValue: (name: string) => unknown;
-  setFieldValue: (name: string, value: unknown) => void;
+  registerField: (
+    name: NamePath,
+    options?: { rules?: FormRule[]; dependencies?: NamePath[] },
+  ) => void;
+  unregisterField: (name: NamePath) => void;
+  updateFieldRules: (name: NamePath, rules: FormRule[] | undefined) => void;
+  updateFieldDependencies: (
+    name: NamePath,
+    dependencies: NamePath[] | undefined,
+  ) => void;
+  getFieldValue: (name: NamePath) => unknown;
+  setFieldValue: (name: NamePath, value: unknown) => void;
   getFieldsValue: () => FormValues;
   setFieldsValue: (values: Partial<FormValues>) => void;
-  getFieldErrors: (name: string) => string[];
-  isFieldValidating: (name: string) => boolean;
-  validateField: (name: string) => Promise<boolean>;
-  validateFields: (names?: string[]) => Promise<ValidateResult>;
+  getFieldErrors: (name: NamePath) => string[];
+  isFieldValidating: (name: NamePath) => boolean;
+  validateField: (name: NamePath) => Promise<boolean>;
+  validateFields: (names?: NamePath[]) => Promise<ValidateResult>;
   validate: () => Promise<ValidateResult>;
-  resetFields: (names?: string[]) => void;
-  clearValidate: (names?: string[]) => void;
+  resetFields: (names?: NamePath[]) => void;
+  clearValidate: (names?: NamePath[]) => void;
   subscribe: (listener: () => void) => () => void;
   getSnapshot: () => number;
 };
 
+function fieldPathExists(root: unknown, path: NamePath): boolean {
+  let current: unknown = root;
+  for (const seg of parseNamePath(path)) {
+    if (current === null || current === undefined || typeof current !== "object") {
+      return false;
+    }
+    if (!(seg in (current as object))) return false;
+    current = (current as Record<string | number, unknown>)[seg as string];
+  }
+  return true;
+}
+
 export function createFormStore(
   options: CreateFormStoreOptions = {},
 ): FormStore {
-  const initialSnapshot: FormValues = { ...(options.initialValues ?? {}) };
-  const values: FormValues = { ...initialSnapshot };
+  const initialSnapshot: FormValues = cloneValues(
+    options.initialValues ?? {},
+  );
+  const values: FormValues = cloneValues(options.initialValues ?? {});
   const fields = new Map<string, FieldMeta>();
   const listeners = new Set<() => void>();
+  const validateGeneration = new Map<string, number>();
   let version = 0;
 
   function notify() {
@@ -44,86 +93,137 @@ export function createFormStore(
     for (const listener of listeners) listener();
   }
 
-  function ensureField(name: string): FieldMeta {
-    let meta = fields.get(name);
+  function keyOf(name: NamePath): string {
+    return normalizeNamePath(name);
+  }
+
+  function ensureField(name: NamePath): FieldMeta {
+    const key = keyOf(name);
+    let meta = fields.get(key);
     if (!meta) {
-      meta = { rules: [], errors: [], validating: false };
-      fields.set(name, meta);
+      meta = { rules: [], errors: [], validating: false, dependencies: [] };
+      fields.set(key, meta);
     }
     return meta;
   }
 
-  async function validateField(name: string): Promise<boolean> {
-    const meta = ensureField(name);
+  async function validateField(name: NamePath): Promise<boolean> {
+    const key = keyOf(name);
+    const meta = ensureField(key);
+    const generation = (validateGeneration.get(key) ?? 0) + 1;
+    validateGeneration.set(key, generation);
     meta.validating = true;
     notify();
-    const errors = await runRules(values[name], { ...values }, meta.rules);
+    const errors = await runRules(
+      getValueAtPath(values, key),
+      cloneValues(values),
+      meta.rules,
+    );
+    if (validateGeneration.get(key) !== generation) {
+      return errors.length === 0;
+    }
     meta.errors = errors;
     meta.validating = false;
     notify();
     return errors.length === 0;
   }
 
-  async function validateFields(names?: string[]): Promise<ValidateResult> {
-    const target = names ?? [...fields.keys()];
-    await Promise.all(target.map((name) => validateField(name)));
+  async function validateFields(names?: NamePath[]): Promise<ValidateResult> {
+    const target = names?.map((n) => keyOf(n)) ?? [...fields.keys()];
+    await Promise.all(target.map((fieldName) => validateField(fieldName)));
     const errors: Record<string, string[]> = {};
     let valid = true;
-    for (const name of target) {
-      const fieldErrors = fields.get(name)?.errors ?? [];
+    for (const fieldName of target) {
+      const fieldErrors = fields.get(fieldName)?.errors ?? [];
       if (fieldErrors.length) {
-        errors[name] = fieldErrors;
+        errors[fieldName] = fieldErrors;
         valid = false;
       }
     }
-    return { valid, values: { ...values }, errors };
+    return { valid, values: cloneValues(values), errors };
+  }
+
+  function revalidateDependents(changedKey: string) {
+    for (const [fieldName, meta] of fields) {
+      if (meta.dependencies.includes(changedKey)) {
+        void validateField(fieldName);
+      }
+    }
   }
 
   return {
     registerField(name, fieldOptions) {
-      const meta = ensureField(name);
+      const key = keyOf(name);
+      const meta = ensureField(key);
       meta.rules = fieldOptions?.rules ?? meta.rules;
-      if (!(name in values)) values[name] = undefined;
+      if (fieldOptions?.dependencies) {
+        meta.dependencies = fieldOptions.dependencies.map((d) => keyOf(d));
+      }
+      if (!fieldPathExists(values, key)) {
+        setValueAtPath(values, key, undefined);
+      }
       notify();
     },
     unregisterField(name) {
-      fields.delete(name);
+      fields.delete(keyOf(name));
       notify();
     },
     updateFieldRules(name, rules) {
       const meta = ensureField(name);
       meta.rules = rules ?? [];
-      notify();
+    },
+    updateFieldDependencies(name, dependencies) {
+      const meta = ensureField(name);
+      meta.dependencies = (dependencies ?? []).map((d) => keyOf(d));
     },
     getFieldValue(name) {
-      return values[name];
+      return getValueAtPath(values, name);
     },
     setFieldValue(name, value) {
-      values[name] = value;
+      const key = keyOf(name);
+      setValueAtPath(values, key, value);
       notify();
+      revalidateDependents(key);
     },
     getFieldsValue() {
-      return { ...values };
+      return cloneValues(values);
     },
     setFieldsValue(next) {
-      Object.assign(values, next);
+      const changedKeys = Object.keys(next);
+      for (const key of changedKeys) {
+        setValueAtPath(values, key, next[key]);
+      }
       notify();
+      for (const key of changedKeys) {
+        revalidateDependents(keyOf(key));
+      }
     },
     getFieldErrors(name) {
-      return [...(fields.get(name)?.errors ?? [])];
+      return [...(fields.get(keyOf(name))?.errors ?? [])];
     },
     isFieldValidating(name) {
-      return fields.get(name)?.validating ?? false;
+      return fields.get(keyOf(name))?.validating ?? false;
     },
     validateField,
     validateFields,
     validate: () => validateFields(),
     resetFields(names) {
-      const target = names ?? Object.keys(initialSnapshot).concat([...fields.keys()]);
-      const unique = [...new Set(target)];
-      for (const name of unique) {
-        values[name] = initialSnapshot[name];
-        const meta = fields.get(name);
+      if (!names) {
+        for (const key of Object.keys(values)) {
+          delete values[key];
+        }
+        Object.assign(values, cloneValues(initialSnapshot));
+        for (const meta of fields.values()) {
+          meta.errors = [];
+          meta.validating = false;
+        }
+        notify();
+        return;
+      }
+      for (const name of names) {
+        const key = keyOf(name);
+        setValueAtPath(values, key, getValueAtPath(initialSnapshot, key));
+        const meta = fields.get(key);
         if (meta) {
           meta.errors = [];
           meta.validating = false;
@@ -132,9 +232,9 @@ export function createFormStore(
       notify();
     },
     clearValidate(names) {
-      const target = names ?? [...fields.keys()];
-      for (const name of target) {
-        const meta = fields.get(name);
+      const target = names?.map((n) => keyOf(n)) ?? [...fields.keys()];
+      for (const fieldName of target) {
+        const meta = fields.get(fieldName);
         if (meta) meta.errors = [];
       }
       notify();

@@ -96,4 +96,123 @@ describe("createFormStore", () => {
     await p;
     expect(store.isFieldValidating("n")).toBe(false);
   });
+
+  it("reads and writes nested paths in values tree", async () => {
+    const store = createFormStore({
+      initialValues: { user: { email: "a@b.c" } },
+    });
+    store.registerField("user.email", {
+      rules: [{ required: true, message: "必填" }],
+    });
+    expect(store.getFieldValue("user.email")).toBe("a@b.c");
+    store.setFieldValue("user.email", "x@y.z");
+    expect(store.getFieldsValue()).toEqual({ user: { email: "x@y.z" } });
+    store.setFieldValue(["users", 0, "name"], "Ada");
+    expect(store.getFieldValue("users.0.name")).toBe("Ada");
+    expect(store.getFieldsValue()).toEqual({
+      user: { email: "x@y.z" },
+      users: [{ name: "Ada" }],
+    });
+    expect(await store.validateField("user.email")).toBe(true);
+  });
+
+  it("revalidates fields that list a changed dependency", async () => {
+    const store = createFormStore({
+      initialValues: { password: "secret", confirm: "nope" },
+    });
+    store.registerField("password");
+    store.registerField("confirm", {
+      dependencies: ["password"],
+      rules: [
+        {
+          validator: (value, values) =>
+            value === values.password ? true : "不一致",
+        },
+      ],
+    });
+    await store.validateField("confirm");
+    expect(store.getFieldErrors("confirm")).toEqual(["不一致"]);
+    store.setFieldValue("password", "nope");
+    await vi.waitFor(() =>
+      expect(store.getFieldErrors("confirm")).toEqual([]),
+    );
+  });
+
+  it("setFieldsValue writes nested paths and revalidates dependents", async () => {
+    const store = createFormStore({
+      initialValues: {
+        user: { email: "old@x.y" },
+        password: "a",
+        confirm: "b",
+      },
+    });
+    store.registerField("user.email");
+    store.registerField("password");
+    store.registerField("confirm", {
+      dependencies: ["password"],
+      rules: [
+        {
+          validator: (value, values) =>
+            value === values.password ? true : "不一致",
+        },
+      ],
+    });
+    await store.validateField("confirm");
+    expect(store.getFieldErrors("confirm")).toEqual(["不一致"]);
+    store.setFieldsValue({ password: "b" });
+    await vi.waitFor(() =>
+      expect(store.getFieldErrors("confirm")).toEqual([]),
+    );
+    store.setFieldsValue({ "user.email": "new@x.y" } as Record<string, unknown>);
+    expect(store.getFieldValue("user.email")).toBe("new@x.y");
+    expect(store.getFieldsValue()).toEqual({
+      user: { email: "new@x.y" },
+      password: "b",
+      confirm: "b",
+    });
+  });
+
+  it("preserves undefined and Date values through getFieldsValue", () => {
+    const d = new Date("2020-01-01T00:00:00.000Z");
+    const store = createFormStore({
+      initialValues: { city: undefined, when: d },
+    });
+    const snapshot = store.getFieldsValue();
+    expect(snapshot).toEqual({ city: undefined, when: d });
+    expect(snapshot.when).toBeInstanceOf(Date);
+  });
+
+  it("ignores stale async validation results", async () => {
+    let resolveFirst!: (v: boolean | string) => void;
+    let resolveSecond!: (v: boolean | string) => void;
+    let calls = 0;
+    const store = createFormStore({ initialValues: { n: "ok" } });
+    store.registerField("n", {
+      rules: [
+        {
+          validator: () => {
+            calls += 1;
+            if (calls === 1) {
+              return new Promise((resolve) => {
+                resolveFirst = resolve;
+              });
+            }
+            return new Promise((resolve) => {
+              resolveSecond = resolve;
+            });
+          },
+        },
+      ],
+    });
+    const first = store.validateField("n");
+    const second = store.validateField("n");
+    resolveFirst("过期错误");
+    await first;
+    expect(store.getFieldErrors("n")).toEqual([]);
+    expect(store.isFieldValidating("n")).toBe(true);
+    resolveSecond(true);
+    await second;
+    expect(store.getFieldErrors("n")).toEqual([]);
+    expect(store.isFieldValidating("n")).toBe(false);
+  });
 });

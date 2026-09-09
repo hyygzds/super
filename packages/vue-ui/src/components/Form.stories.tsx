@@ -194,3 +194,97 @@ export const WithChoices: Story = {
     );
   },
 };
+
+export const NestedAndList: Story = {
+  render: () => {
+    const submitted = ref<string | null>(null);
+    return () => (
+      <div class="max-w-md space-y-2">
+        <Form
+          initialValues={{
+            user: { email: "" },
+            password: "",
+            confirm: "",
+            users: [{ name: "" }],
+          }}
+          onFinish={(values) => {
+            submitted.value = JSON.stringify(values, null, 2);
+          }}
+        >
+          <FormItem
+            name="user.email"
+            label="邮箱"
+            validateTrigger="change"
+            rules={[{ required: true, message: "请输入邮箱" }]}
+          >
+            <Input placeholder="nested path + change trigger" />
+          </FormItem>
+          <FormItem name="password" label="密码">
+            <Input type="password" />
+          </FormItem>
+          <FormItem
+            name="confirm"
+            label="确认密码"
+            dependencies={["password"]}
+            rules={[
+              {
+                validator: (value, values) =>
+                  value === values.password ? true : "两次密码不一致",
+              },
+            ]}
+          >
+            <Input type="password" />
+          </FormItem>
+          <Form.List name="users">
+            {({
+              fields,
+              add,
+              remove,
+            }: {
+              fields: { key: number; name: number }[];
+              add: (v?: unknown) => void;
+              remove: (i: number) => void;
+            }) => (
+              <div class="space-y-2">
+                {fields.map((field) => (
+                  <div key={field.key} class="flex items-end gap-2">
+                    <FormItem
+                      name={[field.name, "name"]}
+                      label={`成员 ${field.name + 1}`}
+                      class="flex-1"
+                    >
+                      <Input placeholder="姓名" />
+                    </FormItem>
+                    <button
+                      type="button"
+                      class="mb-1 rounded border px-2 py-1 text-sm"
+                      onClick={() => remove(field.name)}
+                    >
+                      删除
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  class="rounded border px-3 py-1 text-sm"
+                  onClick={() => add({ name: "" })}
+                >
+                  添加成员
+                </button>
+              </div>
+            )}
+          </Form.List>
+          <button
+            type="submit"
+            class="rounded bg-slate-800 px-4 py-2 text-sm text-white"
+          >
+            提交
+          </button>
+        </Form>
+        {submitted.value ? (
+          <pre class="mt-4 rounded bg-slate-100 p-3 text-xs">{submitted.value}</pre>
+        ) : null}
+      </div>
+    );
+  },
+};
