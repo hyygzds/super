@@ -20,7 +20,22 @@ type FieldMeta = {
 };
 
 function cloneValues<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
+  if (value instanceof Date) {
+    return new Date(value.getTime()) as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => cloneValues(item)) as T;
+  }
+  if (value !== null && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, nested] of Object.entries(
+      value as Record<string, unknown>,
+    )) {
+      out[key] = cloneValues(nested);
+    }
+    return out as T;
+  }
+  return value;
 }
 
 export type FormStore = {
@@ -70,6 +85,7 @@ export function createFormStore(
   const values: FormValues = cloneValues(options.initialValues ?? {});
   const fields = new Map<string, FieldMeta>();
   const listeners = new Set<() => void>();
+  const validateGeneration = new Map<string, number>();
   let version = 0;
 
   function notify() {
@@ -94,6 +110,8 @@ export function createFormStore(
   async function validateField(name: NamePath): Promise<boolean> {
     const key = keyOf(name);
     const meta = ensureField(key);
+    const generation = (validateGeneration.get(key) ?? 0) + 1;
+    validateGeneration.set(key, generation);
     meta.validating = true;
     notify();
     const errors = await runRules(
@@ -101,6 +119,9 @@ export function createFormStore(
       cloneValues(values),
       meta.rules,
     );
+    if (validateGeneration.get(key) !== generation) {
+      return errors.length === 0;
+    }
     meta.errors = errors;
     meta.validating = false;
     notify();
@@ -150,12 +171,10 @@ export function createFormStore(
     updateFieldRules(name, rules) {
       const meta = ensureField(name);
       meta.rules = rules ?? [];
-      notify();
     },
     updateFieldDependencies(name, dependencies) {
       const meta = ensureField(name);
       meta.dependencies = (dependencies ?? []).map((d) => keyOf(d));
-      notify();
     },
     getFieldValue(name) {
       return getValueAtPath(values, name);
@@ -170,8 +189,14 @@ export function createFormStore(
       return cloneValues(values);
     },
     setFieldsValue(next) {
-      Object.assign(values, next);
+      const changedKeys = Object.keys(next);
+      for (const key of changedKeys) {
+        setValueAtPath(values, key, next[key]);
+      }
       notify();
+      for (const key of changedKeys) {
+        revalidateDependents(keyOf(key));
+      }
     },
     getFieldErrors(name) {
       return [...(fields.get(keyOf(name))?.errors ?? [])];

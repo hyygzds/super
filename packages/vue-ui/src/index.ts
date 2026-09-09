@@ -31,6 +31,7 @@ export { Form, FormItem, FormList } from "./components/Form";
 export type {
   FormProps,
   FormItemProps,
+  FormListProps,
   FormListField,
   FormListOperations,
 } from "./components/Form";

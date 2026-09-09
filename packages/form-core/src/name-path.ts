@@ -2,6 +2,8 @@ export type NamePath = string | Array<string | number>;
 
 export function parseNamePath(path: NamePath): Array<string | number> {
   if (Array.isArray(path)) {
+    // Numeric strings become array indexes (list rows). Object keys that
+    // happen to be "0" therefore collapse to the same path as index 0.
     return path.map((seg) => {
       if (typeof seg === "number") return seg;
       if (/^\d+$/.test(seg)) return Number(seg);

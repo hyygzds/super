@@ -340,4 +340,66 @@ describe("Form (Vue)", () => {
     await flushPromises();
     expect(onFinish).toHaveBeenCalledWith({ users: [{ name: "Grace" }] });
   });
+
+  it("Form.List keeps required rules on the shifted row after remove", async () => {
+    const onFinish = vi.fn();
+    const onFinishFailed = vi.fn();
+    const wrapper = mount(
+      defineComponent({
+        setup() {
+          return () => (
+            <Form
+              initialValues={{ users: [{ name: "Ada" }, { name: "Grace" }] }}
+              onFinish={onFinish}
+              onFinishFailed={onFinishFailed}
+            >
+              <Form.List name="users">
+                {({
+                  fields,
+                  remove,
+                }: {
+                  fields: { key: number; name: number }[];
+                  remove: (i: number) => void;
+                }) => (
+                  <>
+                    {fields.map((field) => (
+                      <div key={field.key}>
+                        <FormItem
+                          name={[field.name, "name"]}
+                          label="姓名"
+                          rules={[{ required: true, message: "必填" }]}
+                        >
+                          <input aria-label={`姓名-${field.name}`} />
+                        </FormItem>
+                        <button
+                          type="button"
+                          onClick={() => remove(field.name)}
+                        >
+                          删除-{field.name}
+                        </button>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </Form.List>
+              <button type="submit">提交</button>
+            </Form>
+          );
+        },
+      }),
+    );
+    const remove0 = wrapper
+      .findAll("button")
+      .find((b) => b.text() === "删除-0")!;
+    await remove0.trigger("click");
+    await nextTick();
+    expect(
+      (wrapper.find('input[aria-label="姓名-0"]').element as HTMLInputElement)
+        .value,
+    ).toBe("Grace");
+    await wrapper.find("form").trigger("submit");
+    await flushPromises();
+    expect(onFinishFailed).not.toHaveBeenCalled();
+    expect(onFinish).toHaveBeenCalledWith({ users: [{ name: "Grace" }] });
+  });
 });

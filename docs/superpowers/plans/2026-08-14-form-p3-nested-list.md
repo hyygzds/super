@@ -27,10 +27,10 @@
 **Interfaces:**
 - Produces: `NamePath`, `parseNamePath`, `joinNamePath`, `normalizeNamePath`, `getValueAtPath`, `setValueAtPath`
 
-- [ ] **Step 1: Write failing path tests** (parse, get, set, normalize bracket/dot/array)
-- [ ] **Step 2: Run RED** — `npm test -w @component-ai/form-core -- src/name-path.test.ts`
-- [ ] **Step 3: Implement `name-path.ts` and export**
-- [ ] **Step 4: Run GREEN**
+- [x] **Step 1: Write failing path tests** (parse, get, set, normalize bracket/dot/array)
+- [x] **Step 2: Run RED** — `npm test -w @component-ai/form-core -- src/name-path.test.ts`
+- [x] **Step 3: Implement `name-path.ts` and export**
+- [x] **Step 4: Run GREEN**
 
 ---
 
@@ -45,10 +45,10 @@
 - Consumes: path helpers
 - Produces: nested get/set; `registerField(..., { dependencies? })`; dependency revalidate on `setFieldValue`
 
-- [ ] **Step 1: Write failing store tests** (nested values, deps revalidate)
-- [ ] **Step 2: Run RED**
-- [ ] **Step 3: Implement store changes**
-- [ ] **Step 4: Run GREEN** — full `npm test -w @component-ai/form-core`
+- [x] **Step 1: Write failing store tests** (nested values, deps revalidate)
+- [x] **Step 2: Run RED**
+- [x] **Step 3: Implement store changes**
+- [x] **Step 4: Run GREEN** — full `npm test -w @component-ai/form-core`
 
 ---
 
@@ -60,10 +60,10 @@
 - Modify: `packages/react-ui/src/components/Form.stories.tsx`
 - Modify: `packages/react-ui/src/index.ts`
 
-- [ ] **Step 1: Write failing React tests** (nested submit, change trigger, deps, List add/remove)
-- [ ] **Step 2: Run RED**
-- [ ] **Step 3: Implement FormItem + Form.List + exports**
-- [ ] **Step 4: Run GREEN** — `npm test -w @component-ai/react-ui -- src/components/Form.test.tsx`
+- [x] **Step 1: Write failing React tests** (nested submit, change trigger, deps, List add/remove)
+- [x] **Step 2: Run RED**
+- [x] **Step 3: Implement FormItem + Form.List + exports**
+- [x] **Step 4: Run GREEN** — `npm test -w @component-ai/react-ui -- src/components/Form.test.tsx`
 
 ---
 
@@ -75,10 +75,10 @@
 - Modify: `packages/vue-ui/src/components/Form.stories.tsx`
 - Modify: `packages/vue-ui/src/index.ts`
 
-- [ ] **Step 1: Write failing Vue mirror tests**
-- [ ] **Step 2: Run RED**
-- [ ] **Step 3: Implement Vue FormItem + FormList**
-- [ ] **Step 4: Run GREEN** — `npm test -w @component-ai/vue-ui -- src/components/Form.test.tsx`
+- [x] **Step 1: Write failing Vue mirror tests**
+- [x] **Step 2: Run RED**
+- [x] **Step 3: Implement Vue FormItem + FormList**
+- [x] **Step 4: Run GREEN** — `npm test -w @component-ai/vue-ui -- src/components/Form.test.tsx`
 
 ---
 
@@ -87,10 +87,10 @@
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-13-form-roadmap.md`
 
-- [ ] **Step 1: Update roadmap** with P3 row linking spec + this plan
-- [ ] **Step 2: `npm run build -w @component-ai/form-core`**
-- [ ] **Step 3: `npm run build -w @component-ai/react-ui`**
-- [ ] **Step 4: `npm run build -w @component-ai/vue-ui`**
+- [x] **Step 1: Update roadmap** with P3 row linking spec + this plan
+- [x] **Step 2: `npm run build -w @component-ai/form-core`**
+- [x] **Step 3: `npm run build -w @component-ai/react-ui`**
+- [x] **Step 4: `npm run build -w @component-ai/vue-ui`**
 - [ ] **Step 5: Commit** (user/cloud explicitly requested) with Form P3 message
 
 ## Self-review

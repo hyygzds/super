@@ -1,5 +1,6 @@
 import {
   cloneVNode,
+  computed,
   defineComponent,
   inject,
   onBeforeUnmount,
@@ -35,7 +36,7 @@ type FormContext = {
 };
 
 type FormListContext = {
-  listName: NamePath;
+  listName: Ref<string>;
 };
 
 const FORM_KEY: InjectionKey<FormContext> = Symbol("component-ai-form");
@@ -69,7 +70,7 @@ function resolveFieldName(
   listCtx: FormListContext | undefined,
 ): string | undefined {
   if (name === undefined || name === null || name === "") return undefined;
-  if (listCtx) return joinNamePath(listCtx.listName, name);
+  if (listCtx) return joinNamePath(listCtx.listName.value, name);
   return normalizeNamePath(name);
 }
 
@@ -190,6 +191,10 @@ export type FormListOperations = {
   remove: (index: number) => void;
 };
 
+export type FormListProps = {
+  name: NamePath;
+};
+
 export const FormList = defineComponent({
   name: "FormList",
   props: {
@@ -203,7 +208,7 @@ export const FormList = defineComponent({
     if (!ctx) throw new Error("Form.List must be used inside Form");
     const store = ctx.store;
 
-    const listKey = normalizeNamePath(props.name);
+    const listKey = computed(() => normalizeNamePath(props.name));
     provide(FORM_LIST_KEY, { listName: listKey });
 
     let keySeed = 0;
@@ -223,31 +228,39 @@ export const FormList = defineComponent({
       keys.value = keys.value.slice(0, length);
     }
 
-    const initial = store.getFieldValue(listKey);
-    syncKeys(Array.isArray(initial) ? initial.length : 0);
+    watch(
+      () => {
+        void ctx.tick.value;
+        const listValue = store.getFieldValue(listKey.value);
+        return Array.isArray(listValue) ? listValue.length : 0;
+      },
+      (length) => {
+        syncKeys(length);
+      },
+      { immediate: true },
+    );
 
     function add(defaultValue: unknown = {}) {
-      const current = store.getFieldValue(listKey);
+      const current = store.getFieldValue(listKey.value);
       const arr = Array.isArray(current) ? [...current] : [];
       arr.push(defaultValue);
       keySeed += 1;
       keys.value = [...keys.value, keySeed];
-      store.setFieldValue(listKey, arr);
+      store.setFieldValue(listKey.value, arr);
     }
 
     function remove(index: number) {
-      const current = store.getFieldValue(listKey);
+      const current = store.getFieldValue(listKey.value);
       if (!Array.isArray(current)) return;
       const arr = current.filter((_, i) => i !== index);
       keys.value = keys.value.filter((_, i) => i !== index);
-      store.setFieldValue(listKey, arr);
+      store.setFieldValue(listKey.value, arr);
     }
 
     return () => {
       void ctx.tick.value;
-      const listValue = store.getFieldValue(listKey);
+      const listValue = store.getFieldValue(listKey.value);
       const length = Array.isArray(listValue) ? listValue.length : 0;
-      syncKeys(length);
       const fields: FormListField[] = Array.from({ length }, (_, index) => ({
         key: keys.value[index] ?? index,
         name: index,
@@ -315,6 +328,20 @@ export const FormItem = defineComponent({
         dependencies: props.dependencies,
       });
     });
+
+    watch(
+      () => currentFieldName(),
+      (next, prev) => {
+        if (prev === next) return;
+        if (prev) ctx.store.unregisterField(prev);
+        if (next) {
+          ctx.store.registerField(next, {
+            rules: props.rules,
+            dependencies: props.dependencies,
+          });
+        }
+      },
+    );
 
     onBeforeUnmount(() => {
       const fieldName = currentFieldName();

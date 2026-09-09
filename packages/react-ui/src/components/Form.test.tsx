@@ -266,4 +266,46 @@ describe("Form (React)", () => {
       expect(onFinish).toHaveBeenCalledWith({ users: [{ name: "Grace" }] }),
     );
   });
+
+  it("Form.List keeps required rules on the shifted row after remove", async () => {
+    const user = userEvent.setup();
+    const onFinish = vi.fn();
+    const onFinishFailed = vi.fn();
+    render(
+      <Form
+        initialValues={{ users: [{ name: "Ada" }, { name: "Grace" }] }}
+        onFinish={onFinish}
+        onFinishFailed={onFinishFailed}
+      >
+        <Form.List name="users">
+          {(fields, { remove }) => (
+            <>
+              {fields.map((field) => (
+                <div key={field.key}>
+                  <FormItem
+                    name={[field.name, "name"]}
+                    label="姓名"
+                    rules={[{ required: true, message: "必填" }]}
+                  >
+                    <input aria-label={`姓名-${field.name}`} />
+                  </FormItem>
+                  <button type="button" onClick={() => remove(field.name)}>
+                    删除-{field.name}
+                  </button>
+                </div>
+              ))}
+            </>
+          )}
+        </Form.List>
+        <button type="submit">提交</button>
+      </Form>,
+    );
+    await user.click(screen.getByRole("button", { name: "删除-0" }));
+    expect(screen.getByLabelText("姓名-0")).toHaveValue("Grace");
+    await user.click(screen.getByRole("button", { name: "提交" }));
+    await waitFor(() =>
+      expect(onFinish).toHaveBeenCalledWith({ users: [{ name: "Grace" }] }),
+    );
+    expect(onFinishFailed).not.toHaveBeenCalled();
+  });
 });
