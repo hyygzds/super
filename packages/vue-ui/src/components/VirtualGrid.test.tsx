@@ -662,6 +662,116 @@ describe("VirtualGrid (Vue) sort", () => {
   });
 });
 
+const filterColumns: VirtualGridColumn[] = [
+  { field: "id", title: "标识", width: 80 },
+  { field: "name", title: "名称", filterable: true },
+  { field: "city", title: "城市", filterable: true },
+];
+
+const filterRowsData = [
+  { id: "1", name: "Charlie", city: "Paris" },
+  { id: "2", name: "Alice", city: "London" },
+  { id: "3", name: "Bob", city: "Paris" },
+];
+
+function filterHeader(wrapper: ReturnType<typeof mount>, title: string) {
+  return wrapper
+    .findAll('[role="columnheader"]')
+    .find((h) => h.text().includes(title))!;
+}
+
+function filterInput(wrapper: ReturnType<typeof mount>, title: string) {
+  return filterHeader(wrapper, title).find("input");
+}
+
+describe("VirtualGrid (Vue) filter", () => {
+  it("filters rows as the header input changes and restores when cleared", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: { columns: filterColumns, data: filterRowsData },
+    });
+
+    expect(nameCells(wrapper)).toEqual(["Charlie", "Alice", "Bob"]);
+    await filterInput(wrapper, "名称").setValue("a");
+    expect(wrapper.emitted("update:filters")?.at(-1)).toEqual([{ name: "a" }]);
+    expect(nameCells(wrapper)).toEqual(["Charlie", "Alice"]);
+
+    await filterInput(wrapper, "名称").setValue("");
+    expect(wrapper.emitted("update:filters")?.at(-1)).toEqual([{}]);
+    expect(nameCells(wrapper)).toEqual(["Charlie", "Alice", "Bob"]);
+  });
+
+  it("ANDs multiple column filters", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: { columns: filterColumns, data: filterRowsData },
+    });
+
+    await filterInput(wrapper, "名称").setValue("a");
+    await filterInput(wrapper, "城市").setValue("paris");
+    expect(nameCells(wrapper)).toEqual(["Charlie"]);
+  });
+
+  it("honors controlled filters and does not filter when the parent ignores update:filters", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: filterColumns,
+        data: filterRowsData,
+        filters: { name: "Alice" },
+      },
+    });
+
+    expect(nameCells(wrapper)).toEqual(["Alice"]);
+    await filterInput(wrapper, "名称").setValue("Alicex");
+    expect(wrapper.emitted("update:filters")?.[0]).toEqual([{ name: "Alicex" }]);
+    expect(nameCells(wrapper)).toEqual(["Alice"]);
+  });
+
+  it("resets local pagination to page 1 when a filter changes", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: filterColumns,
+        data: [
+          { id: "1", name: "Zed", city: "A" },
+          { id: "2", name: "Yan", city: "B" },
+          { id: "3", name: "Abe", city: "C" },
+        ],
+        pagination: true,
+        pageSize: 2,
+      },
+    });
+
+    await wrapper.find('button[aria-label="下一页"]').trigger("click");
+    expect(wrapper.text()).toContain("Abe");
+    expect(wrapper.text()).not.toContain("Zed");
+
+    await filterInput(wrapper, "名称").setValue("a");
+    expect(wrapper.emitted("update:page")?.at(-1)).toEqual([1]);
+    expect(wrapper.text()).toContain("Abe");
+    expect(wrapper.text()).toContain("Yan");
+    expect(wrapper.text()).not.toContain("Zed");
+  });
+
+  it("does not filter local rows when remote is enabled", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: filterColumns,
+        data: filterRowsData,
+        remote: true,
+      },
+    });
+
+    await filterInput(wrapper, "名称").setValue("a");
+    expect(wrapper.emitted("update:filters")?.at(-1)).toEqual([{ name: "a" }]);
+    expect(nameCells(wrapper)).toEqual(["Charlie", "Alice", "Bob"]);
+  });
+
+  it("does not add a filter input on columns without filterable", () => {
+    const wrapper = mount(VirtualGrid, {
+      props: { columns: filterColumns, data: filterRowsData },
+    });
+    expect(filterHeader(wrapper, "标识").find("input").exists()).toBe(false);
+  });
+});
+
 describe("VirtualGrid (Vue) overflow tooltip", () => {
   beforeEach(() => {
     Object.defineProperty(HTMLElement.prototype, "scrollWidth", {

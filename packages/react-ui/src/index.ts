@@ -36,6 +36,7 @@ export type {
   VirtualGridCellChangeInfo,
   VirtualGridHeaderContext,
   VirtualGridExpandedRowContext,
+  FilterState,
   GroupByConfig,
   SortState,
   SpanMethod,

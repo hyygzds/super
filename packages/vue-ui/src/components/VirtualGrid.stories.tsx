@@ -139,6 +139,31 @@ export const Sort: Story = {
   ),
 };
 
+const filterDemoRows = [
+  { id: "1", name: "Charlie", city: "Paris" },
+  { id: "2", name: "Alice", city: "London" },
+  { id: "3", name: "Bob", city: "Paris" },
+  { id: "4", name: "Diana", city: "Berlin" },
+  { id: "5", name: "Eve", city: "London" },
+  { id: "6", name: "Frank", city: "Paris" },
+  { id: "7", name: "Grace", city: "Berlin" },
+  { id: "8", name: "Hank", city: "London" },
+];
+
+export const Filter: Story = {
+  render: () => (
+    <VirtualGrid
+      columns={[
+        { field: "id", title: "标识", width: 80 },
+        { field: "name", title: "名称", width: 140, filterable: true },
+        { field: "city", title: "城市", width: 140, filterable: true },
+      ]}
+      data={filterDemoRows}
+      height={320}
+    />
+  ),
+};
+
 export const SelectionWithPagination: Story = {
   render: () => (
     <VirtualGrid

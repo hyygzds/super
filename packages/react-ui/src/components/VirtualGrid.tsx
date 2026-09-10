@@ -5,6 +5,7 @@ import {
   clearKeys,
   computeVirtualWindow,
   flattenLeafColumns,
+  filterRows,
   flattenTree,
   isAllSelected,
   isIndeterminate,
@@ -12,11 +13,14 @@ import {
   nextSortState,
   normalizeSpans,
   selectAllKeys,
+  setFilterValue,
   slicePage,
   sortRows,
   toggleExpandKey,
   toggleKey,
   type DisplayRow,
+  type FilterPredicate,
+  type FilterState,
   type GridColumn,
   type GroupByConfig,
   type HeaderCell,
@@ -63,13 +67,15 @@ export type VirtualGridColumn = GridColumn & {
   editable?: boolean;
   sortable?: boolean;
   sorter?: SortCompare;
+  filterable?: boolean;
+  filter?: FilterPredicate;
   showOverflowTooltip?: boolean;
   render?: (ctx: VirtualGridCellContext) => ReactNode;
   renderHeader?: (ctx: VirtualGridHeaderContext) => ReactNode;
   children?: VirtualGridColumn[];
 };
 
-export type { GroupByConfig, SortState, SpanMethod };
+export type { FilterState, GroupByConfig, SortState, SpanMethod };
 
 export type VirtualGridExpandedRowContext = {
   row: Record<string, unknown>;
@@ -138,6 +144,9 @@ export type VirtualGridProps = {
   sort?: SortState | null;
   defaultSort?: SortState | null;
   onSortChange?: (sort: SortState | null) => void;
+  filters?: FilterState;
+  defaultFilters?: FilterState;
+  onFiltersChange?: (filters: FilterState) => void;
 };
 
 const ROW_NUMBER_WIDTH = 48;
@@ -478,6 +487,9 @@ export function VirtualGrid({
   sort: sortProp,
   defaultSort = null,
   onSortChange,
+  filters: filtersProp,
+  defaultFilters = {},
+  onFiltersChange,
 }: VirtualGridProps) {
   const [scrollTop, setScrollTop] = useState(0);
   const [headerHeight, setHeaderHeight] = useState(0);
@@ -507,6 +519,8 @@ export function VirtualGrid({
   const [uncontrolledSort, setUncontrolledSort] = useState<SortState | null>(
     defaultSort,
   );
+  const [uncontrolledFilters, setUncontrolledFilters] =
+    useState<FilterState>(defaultFilters);
   const [editingCell, setEditingCell] = useState<{
     rowKey: string;
     field: string;
@@ -521,6 +535,7 @@ export function VirtualGrid({
   const expandedRowKeys = expandedRowKeysProp ?? uncontrolledExpandedRowKeys;
   const editingRowKey = editingRowKeyProp ?? uncontrolledEditingRowKey;
   const sort = sortProp !== undefined ? sortProp : uncontrolledSort;
+  const filters = filtersProp ?? uncontrolledFilters;
 
   const showExpandCol = expandable !== undefined && expandable !== false;
   const showRowActions = editMode === "row";
@@ -554,6 +569,14 @@ export function VirtualGrid({
     }
   }
 
+  function commitFilters(next: FilterState) {
+    if (filtersProp === undefined) setUncontrolledFilters(next);
+    onFiltersChange?.(next);
+    if (pagination && !remote) {
+      setPage(1);
+    }
+  }
+
   function setPage(next: number) {
     if (pageProp === undefined) setUncontrolledPage(next);
     onPageChange?.(next);
@@ -580,13 +603,34 @@ export function VirtualGrid({
 
   const sortedSource = useMemo(() => {
     const source = tree ? treeData : data;
-    if (remote || !sort) return source;
+    const predicates = Object.fromEntries(
+      leafColumns
+        .filter((col) => col.filter)
+        .map((col) => [col.field, col.filter!]),
+    );
+    const filtered =
+      remote
+        ? source
+        : filterRows(source, filters, {
+            predicates,
+            childrenField: tree ? childrenField : undefined,
+          });
+    if (remote || !sort) return filtered;
     const column = leafColumns.find((col) => col.field === sort.field);
-    return sortRows(source, sort, {
+    return sortRows(filtered, sort, {
       compare: column?.sorter,
       childrenField: tree ? childrenField : undefined,
     });
-  }, [tree, treeData, data, remote, sort, leafColumns, childrenField]);
+  }, [
+    tree,
+    treeData,
+    data,
+    remote,
+    filters,
+    sort,
+    leafColumns,
+    childrenField,
+  ]);
 
   const treeFlat = useMemo(
     () =>
@@ -1082,6 +1126,12 @@ export function VirtualGrid({
     return !!column.sortable && !(column.children && column.children.length > 0);
   }
 
+  function isLeafFilterable(column: VirtualGridColumn): boolean {
+    return !!column.filterable && !(column.children && column.children.length > 0);
+  }
+
+  const hasFilterableLeaf = leafColumns.some(isLeafFilterable);
+
   function headerAriaSort(
     column: VirtualGridColumn | undefined,
   ): "none" | "ascending" | "descending" | undefined {
@@ -1094,10 +1144,7 @@ export function VirtualGrid({
 
   function renderHeaderCell(column: VirtualGridColumn): ReactNode {
     const label = renderHeaderLabel(column);
-    if (!isLeafSortable(column)) return label;
-    const indicator =
-      sort?.field === column.field ? (sort.order === "asc" ? "↑" : "↓") : "↕";
-    return (
+    const titleNode = isLeafSortable(column) ? (
       <button
         type="button"
         className="inline-flex min-w-0 items-center gap-1 text-left"
@@ -1105,9 +1152,33 @@ export function VirtualGrid({
       >
         <span className="truncate">{label}</span>
         <span aria-hidden className="shrink-0 text-xs text-slate-400">
-          {indicator}
+          {sort?.field === column.field
+            ? sort.order === "asc"
+              ? "↑"
+              : "↓"
+            : "↕"}
         </span>
       </button>
+    ) : (
+      label
+    );
+    if (!isLeafFilterable(column)) return titleNode;
+    return (
+      <div className="flex min-w-0 flex-col items-stretch gap-1">
+        {titleNode}
+        <label className="block min-w-0 font-normal">
+          <span className="sr-only">{`筛选${column.title}`}</span>
+          <Input
+            type="search"
+            clearable
+            value={filters[column.field] ?? ""}
+            placeholder="筛选"
+            onChange={(value) =>
+              commitFilters(setFilterValue(filters, column.field, value))
+            }
+          />
+        </label>
+      </div>
     );
   }
 
@@ -1573,7 +1644,9 @@ export function VirtualGrid({
           style={{
             display: "grid",
             gridTemplateColumns,
-            gridTemplateRows: `repeat(${headerDepth}, ${rowHeight}px)`,
+            gridTemplateRows: `repeat(${headerDepth}, ${
+              hasFilterableLeaf ? "minmax(" + rowHeight + "px, auto)" : `${rowHeight}px`
+            })`,
             position: "sticky",
             top: 0,
             zIndex: 5,
