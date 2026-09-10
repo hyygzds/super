@@ -43,6 +43,37 @@ export const Empty: Story = {
   args: { columns, data: [] },
 };
 
+export const OverflowTooltip: Story = {
+  args: {
+    columns: [
+      { field: "id", title: "标识", width: 72 },
+      { field: "name", title: "名称", width: 96 },
+      {
+        field: "note",
+        title: "备注",
+        width: 140,
+      },
+    ],
+    data: [
+      {
+        id: "1",
+        name: "超长名称会被截断显示",
+        note: "单元格内容较多时，悬停可查看完整备注：项目验收纪要、待办事项与补充说明。",
+      },
+      {
+        id: "2",
+        name: "短名",
+        note: "短备注",
+      },
+      {
+        id: "3",
+        name: "另一段很长的名称用于演示省略号",
+        note: "关闭 showOverflowTooltip 后将无法通过悬停阅读完整内容。",
+      },
+    ],
+  },
+};
+
 export const Virtual: Story = {
   args: {
     columns,
@@ -131,6 +162,34 @@ export const CellTemplate: Story = {
       ) : (
         String(value ?? "")
       ),
+  },
+};
+
+export const OverflowTooltip: Story = {
+  args: {
+    columns: [
+      { field: "id", title: "标识", width: 64 },
+      { field: "name", title: "超长表头标题会被截断", width: 96 },
+      {
+        field: "remark",
+        title: "备注",
+        width: 140,
+      },
+    ],
+    data: [
+      {
+        id: "1",
+        name: "这是一段会被列宽截断的超长单元格内容，悬停单元格可查看完整文本",
+        remark:
+          "备注同样可能超出列宽：采购申请已提交财务复核，等待本周内完成审批并回写单号。",
+      },
+      {
+        id: "2",
+        name: "短文本",
+        remark: "正常长度备注",
+      },
+    ],
+    bordered: true,
   },
 };
 

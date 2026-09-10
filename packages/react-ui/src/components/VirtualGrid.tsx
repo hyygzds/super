@@ -39,6 +39,7 @@ import { Button } from "./Button";
 import { Checkbox } from "./Checkbox";
 import { Input } from "./Input";
 import { Pagination } from "./Pagination";
+import { Tooltip } from "./Tooltip";
 
 export type VirtualGridCellContext = {
   row: Record<string, unknown>;
@@ -62,6 +63,7 @@ export type VirtualGridColumn = GridColumn & {
   editable?: boolean;
   sortable?: boolean;
   sorter?: SortCompare;
+  showOverflowTooltip?: boolean;
   render?: (ctx: VirtualGridCellContext) => ReactNode;
   renderHeader?: (ctx: VirtualGridHeaderContext) => ReactNode;
   children?: VirtualGridColumn[];
@@ -83,6 +85,7 @@ export type VirtualGridProps = {
   virtual?: boolean;
   overscan?: number;
   autoHeight?: boolean;
+  showOverflowTooltip?: boolean;
   bordered?: boolean;
   stripe?: boolean;
   showRowNumber?: boolean;
@@ -181,6 +184,12 @@ function colWidth(col: VirtualGridColumn, forcePx: boolean): number | null {
   if (col.width != null) return col.width;
   if (col.fixed || forcePx) return DEFAULT_COL_WIDTH;
   return null;
+}
+
+function overflowTitle(value: unknown): string | undefined {
+  if (value == null) return undefined;
+  const text = String(value);
+  return text === "" ? undefined : text;
 }
 
 function buildLayout(
@@ -379,6 +388,22 @@ function setChildrenAtKey(
   });
 }
 
+function overflowTooltipText(value: unknown): string {
+  if (value == null) return "";
+  const text = String(value);
+  return text.trim().length === 0 ? "" : text;
+}
+
+function shouldShowOverflowTooltip(
+  column: VirtualGridColumn,
+  showOverflowTooltip: boolean,
+  autoHeight: boolean,
+): boolean {
+  if (column.showOverflowTooltip != null) return column.showOverflowTooltip;
+  if (autoHeight) return false;
+  return showOverflowTooltip;
+}
+
 function rowLabel(row: Record<string, unknown>, key: string): string {
   const name = row.name;
   return typeof name === "string" && name.length > 0 ? name : key;
@@ -402,6 +427,7 @@ export function VirtualGrid({
   virtual = false,
   overscan = 4,
   autoHeight = false,
+  showOverflowTooltip = true,
   bordered = true,
   stripe = false,
   showRowNumber = false,
@@ -984,12 +1010,30 @@ export function VirtualGrid({
       );
     };
 
+    const usedCustom = Boolean(column.render) || Boolean(renderCell);
+    const wrapOverflow = (node: ReactNode, triggerClass: string) => {
+      const text = overflowTooltipText(value);
+      if (
+        usedCustom ||
+        !shouldShowOverflowTooltip(column, showOverflowTooltip, autoHeight) ||
+        !text
+      ) {
+        return node;
+      }
+      return (
+        <Tooltip content={text} onlyIfOverflow className={triggerClass}>
+          {node}
+        </Tooltip>
+      );
+    };
+
     if (tree && isFirstDataCol) {
       const depth = treeMeta?.depth ?? 0;
       const hasChildren = treeMeta?.hasChildren ?? false;
       const expanded = treeMeta?.expanded ?? false;
       const label = rowLabel(row, treeMeta?.key ?? key);
-      return wrapEditable(
+      return wrapOverflow(
+        wrapEditable(
         <div
           className="flex min-w-0 items-center gap-1"
           style={{ paddingLeft: depth * TREE_INDENT }}
@@ -1020,9 +1064,11 @@ export function VirtualGrid({
           )}
           <span className="min-w-0 truncate">{content}</span>
         </div>,
-      );
+      ),
+        "min-w-0 w-full",
+    );
     }
-    return wrapEditable(content);
+    return wrapOverflow(wrapEditable(content), "block min-w-0 w-full truncate");
   }
 
   function renderHeaderLabel(column: VirtualGridColumn): ReactNode {
@@ -1277,6 +1323,7 @@ export function VirtualGrid({
               role="cell"
               className={cellClass(autoHeight)}
               style={stickyStyle(item, false, rowBg)}
+              title={overflowTitle(display.row[item.column.field])}
             >
               {renderDataCell(
                 item.column,
@@ -1447,6 +1494,7 @@ export function VirtualGrid({
               ...sticky,
               background: sticky?.background ?? rowBg,
             }}
+            title={overflowTitle(display.row[column.field])}
           >
             {renderDataCell(
               column,
@@ -1610,6 +1658,7 @@ export function VirtualGrid({
                   gridRow,
                   ...sticky,
                 }}
+                title={overflowTitle(cell.title)}
               >
                 {cell.column
                   ? renderHeaderCell(cell.column as VirtualGridColumn)

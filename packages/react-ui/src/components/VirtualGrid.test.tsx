@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { VirtualGrid, type VirtualGridColumn } from "./VirtualGrid";
@@ -466,6 +466,47 @@ describe("VirtualGrid (React) P5 edit / remote", () => {
     expect(onRowSave).toHaveBeenCalledWith({ id: "1", name: "Gamma" });
   });
 
+  it("exposes overflowing cell and header text via title so the full value can be read", () => {
+    const longName =
+      "这是一段会被列宽截断的超长单元格内容，需要通过悬停查看完整文本";
+    const longHeader = "超长表头标题会被截断";
+    render(
+      <VirtualGrid
+        columns={[
+          { field: "id", title: "标识", width: 80 },
+          { field: "name", title: longHeader, width: 80 },
+        ]}
+        data={[{ id: "1", name: longName }]}
+      />,
+    );
+
+    const nameCell = screen.getByText(longName).closest("[role='cell']");
+    expect(nameCell).toHaveAttribute("title", longName);
+    expect(
+      screen.getByRole("columnheader", { name: longHeader }),
+    ).toHaveAttribute("title", longHeader);
+  });
+
+  it("still exposes the raw cell value on title when a custom cell renderer is used", () => {
+    const longName = "自定义渲染后仍然需要能读到被截断的原始值";
+    render(
+      <VirtualGrid
+        columns={[
+          {
+            field: "name",
+            title: "名称",
+            width: 80,
+            render: ({ value }) => <strong>{String(value)}</strong>,
+          },
+        ]}
+        data={[{ id: "1", name: longName }]}
+      />,
+    );
+
+    const nameCell = screen.getByText(longName).closest("[role='cell']");
+    expect(nameCell).toHaveAttribute("title", longName);
+  });
+
   it("remote+pagination does not slice and shows total", () => {
     render(
       <VirtualGrid
@@ -644,5 +685,113 @@ describe("VirtualGrid (React) sort", () => {
     const idHeader = screen.getByRole("columnheader", { name: "标识" });
     expect(within(idHeader).queryByRole("button")).not.toBeInTheDocument();
     expect(idHeader).not.toHaveAttribute("aria-sort");
+  });
+});
+
+describe("VirtualGrid (React) overflow tooltip", () => {
+  beforeEach(() => {
+    Object.defineProperty(HTMLElement.prototype, "scrollWidth", {
+      configurable: true,
+      get() {
+        return 240;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+      configurable: true,
+      get() {
+        return 80;
+      },
+    });
+  });
+
+  it("shows a tooltip with the full cell text when hovering a truncated cell", async () => {
+    const user = userEvent.setup();
+    const longNote = "这是一段很长的单元格内容，默认会被截断无法直接看完";
+    render(
+      <VirtualGrid
+        columns={[
+          { field: "id", title: "标识", width: 80 },
+          { field: "note", title: "备注", width: 80 },
+        ]}
+        data={[{ id: "1", note: longNote }]}
+      />,
+    );
+
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    await user.hover(screen.getByText(longNote));
+    expect(screen.getByRole("tooltip")).toHaveTextContent(longNote);
+  });
+
+  it("does not show an overflow tooltip when showOverflowTooltip is false", async () => {
+    const user = userEvent.setup();
+    const longNote = "关闭溢出提示后不应弹出完整内容";
+    render(
+      <VirtualGrid
+        columns={[
+          { field: "id", title: "标识", width: 80 },
+          { field: "note", title: "备注", width: 80 },
+        ]}
+        data={[{ id: "1", note: longNote }]}
+        showOverflowTooltip={false}
+      />,
+    );
+
+    await user.hover(screen.getByText(longNote));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("does not show an overflow tooltip when autoHeight wraps the cell", async () => {
+    const user = userEvent.setup();
+    const longNote = "自动行高时内容已完整展示，不必再弹出提示";
+    render(
+      <VirtualGrid
+        columns={[
+          { field: "id", title: "标识", width: 80 },
+          { field: "note", title: "备注", width: 160 },
+        ]}
+        data={[{ id: "1", note: longNote }]}
+        autoHeight
+      />,
+    );
+
+    await user.hover(screen.getByText(longNote));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("honors a column-level showOverflowTooltip override", async () => {
+    const user = userEvent.setup();
+    const longNote = "列级关闭后这条备注不应弹出提示";
+    render(
+      <VirtualGrid
+        columns={[
+          { field: "id", title: "标识", width: 80 },
+          { field: "note", title: "备注", width: 80, showOverflowTooltip: false },
+        ]}
+        data={[{ id: "1", note: longNote }]}
+      />,
+    );
+
+    await user.hover(screen.getByText(longNote));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("does not wrap custom cell renders with an overflow tooltip", async () => {
+    const user = userEvent.setup();
+    render(
+      <VirtualGrid
+        columns={[
+          {
+            field: "note",
+            title: "备注",
+            width: 80,
+            render: ({ value }) => <button type="button">{String(value)}</button>,
+          },
+        ]}
+        data={[{ id: "1", note: "自定义渲染" }]}
+      />,
+    );
+
+    await user.hover(screen.getByRole("button", { name: "自定义渲染" }));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 });

@@ -40,12 +40,14 @@ import {
 import { Checkbox } from "./Checkbox";
 import { Input } from "./Input";
 import { Pagination } from "./Pagination";
+import { Tooltip } from "./Tooltip";
 
 export type VirtualGridColumn = GridColumn & {
   /** When set, overrides table-level `editable` for this column. */
   editable?: boolean;
   sortable?: boolean;
   sorter?: SortCompare;
+  showOverflowTooltip?: boolean;
 };
 
 export type VirtualGridCellChangePayload = {
@@ -130,6 +132,12 @@ function colWidth(col: VirtualGridColumn, forcePx: boolean): number | null {
   if (col.width != null) return col.width;
   if (col.fixed || forcePx) return DEFAULT_COL_WIDTH;
   return null;
+}
+
+function overflowTitle(value: unknown): string | undefined {
+  if (value == null) return undefined;
+  const text = String(value);
+  return text === "" ? undefined : text;
 }
 
 function buildLayout(
@@ -354,6 +362,7 @@ export const VirtualGrid = defineComponent({
     virtual: { type: Boolean, default: false },
     overscan: { type: Number, default: 4 },
     autoHeight: { type: Boolean, default: false },
+    showOverflowTooltip: { type: Boolean, default: true },
     bordered: { type: Boolean, default: true },
     stripe: { type: Boolean, default: false },
     showRowNumber: { type: Boolean, default: false },
@@ -957,6 +966,18 @@ export const VirtualGrid = defineComponent({
       commitEditingRowKey(null);
     }
 
+    function overflowTooltipText(value: unknown): string {
+      if (value == null) return "";
+      const text = String(value);
+      return text.trim().length === 0 ? "" : text;
+    }
+
+    function shouldShowOverflowTooltip(column: VirtualGridColumn): boolean {
+      if (column.showOverflowTooltip != null) return column.showOverflowTooltip;
+      if (props.autoHeight) return false;
+      return props.showOverflowTooltip;
+    }
+
     function renderDataCell(
       column: VirtualGridColumn,
       row: Record<string, unknown>,
@@ -1028,7 +1049,14 @@ export const VirtualGrid = defineComponent({
         );
       }
 
-      return String(value ?? "");
+      const text = String(value ?? "");
+      const tooltip = overflowTooltipText(value);
+      if (!shouldShowOverflowTooltip(column) || !tooltip) return text;
+      return (
+        <Tooltip content={tooltip} onlyIfOverflow class="block min-w-0 w-full truncate">
+          {text}
+        </Tooltip>
+      );
     }
 
     function renderRowEditActions(key: string, row: Record<string, unknown>) {
@@ -1313,6 +1341,7 @@ export const VirtualGrid = defineComponent({
                 role="cell"
                 class={cellClass(props.autoHeight)}
                 style={stickyStyle(item, false, rowBg)}
+                title={overflowTitle(display.row[item.column.field])}
                 onDblclick={
                   canEditCell
                     ? () => beginCellEdit(key, item.column, display.row)
@@ -1459,6 +1488,7 @@ export const VirtualGrid = defineComponent({
                 ...sticky,
                 background: sticky?.background ?? rowBg,
               }}
+              title={overflowTitle(display.row[column.field])}
               onDblclick={
                 canEditCell
                   ? () => beginCellEdit(key, column, display.row)
@@ -1626,6 +1656,7 @@ export const VirtualGrid = defineComponent({
                       gridRow,
                       ...sticky,
                     }}
+                    title={overflowTitle(cell.title)}
                   >
                     {cell.column
                       ? renderHeaderCell(cell.column)

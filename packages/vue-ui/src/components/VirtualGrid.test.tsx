@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { h } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
+import { Tooltip } from "./Tooltip";
 import { VirtualGrid } from "./VirtualGrid";
 import type { VirtualGridColumn } from "./VirtualGrid";
 
@@ -469,6 +470,49 @@ describe("VirtualGrid (Vue) P5 edit / remote", () => {
     expect(wrapper.emitted("update:editingRowKey")?.[0]).toEqual([null]);
   });
 
+  it("exposes overflowing cell and header text via title so the full value can be read", () => {
+    const longName =
+      "这是一段会被列宽截断的超长单元格内容，需要通过悬停查看完整文本";
+    const longHeader = "超长表头标题会被截断";
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: [
+          { field: "id", title: "标识", width: 80 },
+          { field: "name", title: longHeader, width: 80 },
+        ],
+        data: [{ id: "1", name: longName }],
+      },
+    });
+
+    const nameCell = wrapper
+      .findAll('[role="cell"]')
+      .find((cell) => cell.text() === longName);
+    expect(nameCell?.attributes("title")).toBe(longName);
+    const header = wrapper
+      .findAll('[role="columnheader"]')
+      .find((cell) => cell.text() === longHeader);
+    expect(header?.attributes("title")).toBe(longHeader);
+  });
+
+  it("still exposes the raw cell value on title when a custom cell slot is used", () => {
+    const longName = "自定义渲染后仍然需要能读到被截断的原始值";
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: [{ field: "name", title: "名称", width: 80 }],
+        data: [{ id: "1", name: longName }],
+      },
+      slots: {
+        cell: ({ value }: { value: unknown }) =>
+          h("strong", String(value ?? "")),
+      },
+    });
+
+    const nameCell = wrapper
+      .findAll('[role="cell"]')
+      .find((cell) => cell.text() === longName);
+    expect(nameCell?.attributes("title")).toBe(longName);
+  });
+
   it("does not slice data when remote pagination is enabled", () => {
     const pageData = makeRows(3).map((r, i) => ({
       ...r,
@@ -615,5 +659,135 @@ describe("VirtualGrid (Vue) sort", () => {
       .find((h) => h.text().includes("标识"))!;
     expect(idHeader.find("button").exists()).toBe(false);
     expect(idHeader.attributes("aria-sort")).toBeUndefined();
+  });
+});
+
+describe("VirtualGrid (Vue) overflow tooltip", () => {
+  beforeEach(() => {
+    Object.defineProperty(HTMLElement.prototype, "scrollWidth", {
+      configurable: true,
+      get() {
+        return 240;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+      configurable: true,
+      get() {
+        return 80;
+      },
+    });
+  });
+
+  it("shows a tooltip with the full cell text when hovering a truncated cell", async () => {
+    const longNote = "这是一段很长的单元格内容，默认会被截断无法直接看完";
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: [
+          { field: "id", title: "标识", width: 80 },
+          { field: "note", title: "备注", width: 80 },
+        ],
+        data: [{ id: "1", note: longNote }],
+      },
+      attachTo: document.body,
+    });
+
+    expect(document.body.querySelector('[role="tooltip"]')).toBeNull();
+    const cell = wrapper
+      .findAll('[role="cell"]')
+      .find((item) => item.text().includes(longNote));
+    expect(cell).toBeTruthy();
+    await cell!.findComponent(Tooltip).trigger("mouseenter");
+    expect(document.body.querySelector('[role="tooltip"]')?.textContent).toBe(
+      longNote,
+    );
+
+    wrapper.unmount();
+  });
+
+  it("does not show an overflow tooltip when showOverflowTooltip is false", async () => {
+    const longNote = "关闭溢出提示后不应弹出完整内容";
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: [
+          { field: "id", title: "标识", width: 80 },
+          { field: "note", title: "备注", width: 80 },
+        ],
+        data: [{ id: "1", note: longNote }],
+        showOverflowTooltip: false,
+      },
+      attachTo: document.body,
+    });
+
+    const cell = wrapper
+      .findAll('[role="cell"]')
+      .find((item) => item.text().includes(longNote));
+    await cell!.trigger("mouseenter");
+    expect(document.body.querySelector('[role="tooltip"]')).toBeNull();
+
+    wrapper.unmount();
+  });
+
+  it("does not show an overflow tooltip when autoHeight wraps the cell", async () => {
+    const longNote = "自动行高时内容已完整展示，不必再弹出提示";
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: [
+          { field: "id", title: "标识", width: 80 },
+          { field: "note", title: "备注", width: 160 },
+        ],
+        data: [{ id: "1", note: longNote }],
+        autoHeight: true,
+      },
+      attachTo: document.body,
+    });
+
+    const cell = wrapper
+      .findAll('[role="cell"]')
+      .find((item) => item.text().includes(longNote));
+    await cell!.trigger("mouseenter");
+    expect(document.body.querySelector('[role="tooltip"]')).toBeNull();
+
+    wrapper.unmount();
+  });
+
+  it("honors a column-level showOverflowTooltip override", async () => {
+    const longNote = "列级关闭后这条备注不应弹出提示";
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: [
+          { field: "id", title: "标识", width: 80 },
+          { field: "note", title: "备注", width: 80, showOverflowTooltip: false },
+        ],
+        data: [{ id: "1", note: longNote }],
+      },
+      attachTo: document.body,
+    });
+
+    const cell = wrapper
+      .findAll('[role="cell"]')
+      .find((item) => item.text().includes(longNote));
+    expect(cell!.findComponent(Tooltip).exists()).toBe(false);
+
+    wrapper.unmount();
+  });
+
+  it("does not wrap custom cell slots with an overflow tooltip", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: [{ field: "note", title: "备注", width: 80 }],
+        data: [{ id: "1", note: "自定义渲染" }],
+      },
+      slots: {
+        "cell-note": () => h("button", { type: "button" }, "自定义渲染"),
+      },
+      attachTo: document.body,
+    });
+
+    const cell = wrapper
+      .findAll('[role="cell"]')
+      .find((item) => item.text().includes("自定义渲染"));
+    expect(cell!.findComponent(Tooltip).exists()).toBe(false);
+
+    wrapper.unmount();
   });
 });
