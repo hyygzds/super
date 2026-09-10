@@ -95,8 +95,16 @@ export const Tooltip = defineComponent({
 
     watch(
       currentOpen,
-      (open) => {
-        if (open) void nextTick(syncPosition);
+      (open, _prev, onCleanup) => {
+        if (!open) return;
+        void nextTick(syncPosition);
+        const onScroll = () => commitOpen(false);
+        window.addEventListener("scroll", onScroll, true);
+        window.addEventListener("resize", syncPosition);
+        onCleanup(() => {
+          window.removeEventListener("scroll", onScroll, true);
+          window.removeEventListener("resize", syncPosition);
+        });
       },
       { immediate: true },
     );

@@ -62,6 +62,23 @@ describe("Tooltip (Vue)", () => {
     wrapper.unmount();
   });
 
+  it("closes on ancestor scroll so a fixed popup does not linger", async () => {
+    const wrapper = mount(Tooltip, {
+      props: { content: "完整内容" },
+      slots: { default: () => "截断文本" },
+      attachTo: document.body,
+    });
+
+    await wrapper.trigger("mouseenter");
+    expect(document.body.querySelector('[role="tooltip"]')).not.toBeNull();
+
+    window.dispatchEvent(new Event("scroll"));
+    await wrapper.vm.$nextTick();
+    expect(document.body.querySelector('[role="tooltip"]')).toBeNull();
+
+    wrapper.unmount();
+  });
+
   it("does not open when disabled", async () => {
     const wrapper = mount(Tooltip, {
       props: { content: "提示", disabled: true },

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Tooltip } from "./Tooltip";
 
@@ -56,6 +56,21 @@ describe("Tooltip (React)", () => {
     );
 
     await user.hover(screen.getByText("短文本"));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("closes on ancestor scroll so a fixed popup does not linger", async () => {
+    const user = userEvent.setup();
+    render(
+      <Tooltip content="完整内容">
+        <span>截断文本</span>
+      </Tooltip>,
+    );
+
+    await user.hover(screen.getByText("截断文本"));
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
+
+    fireEvent.scroll(window);
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 

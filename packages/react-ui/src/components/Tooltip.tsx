@@ -82,7 +82,18 @@ export function Tooltip({
 
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) return;
-    setCoords(positionStyle(triggerRef.current.getBoundingClientRect()));
+    const update = () => {
+      if (!triggerRef.current) return;
+      setCoords(positionStyle(triggerRef.current.getBoundingClientRect()));
+    };
+    update();
+    const onScroll = () => commitOpen(false);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", update);
+    };
   }, [open]);
 
   function onKeyDown(event: KeyboardEvent<HTMLSpanElement>) {
