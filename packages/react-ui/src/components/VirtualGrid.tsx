@@ -9,15 +9,19 @@ import {
   isAllSelected,
   isIndeterminate,
   isTreeIndeterminate,
+  nextSortState,
   normalizeSpans,
   selectAllKeys,
   slicePage,
+  sortRows,
   toggleExpandKey,
   toggleKey,
   type DisplayRow,
   type GridColumn,
   type GroupByConfig,
   type HeaderCell,
+  type SortCompare,
+  type SortState,
   type SpanMethod,
   type TreeFlatRow,
 } from "@component-ai/grid-core";
@@ -56,12 +60,14 @@ export type VirtualGridCellChangeInfo = {
 
 export type VirtualGridColumn = GridColumn & {
   editable?: boolean;
+  sortable?: boolean;
+  sorter?: SortCompare;
   render?: (ctx: VirtualGridCellContext) => ReactNode;
   renderHeader?: (ctx: VirtualGridHeaderContext) => ReactNode;
   children?: VirtualGridColumn[];
 };
 
-export type { GroupByConfig, SpanMethod };
+export type { GroupByConfig, SortState, SpanMethod };
 
 export type VirtualGridExpandedRowContext = {
   row: Record<string, unknown>;
@@ -126,6 +132,9 @@ export type VirtualGridProps = {
   remote?: boolean;
   total?: number;
   loading?: boolean;
+  sort?: SortState | null;
+  defaultSort?: SortState | null;
+  onSortChange?: (sort: SortState | null) => void;
 };
 
 const ROW_NUMBER_WIDTH = 48;
@@ -440,6 +449,9 @@ export function VirtualGrid({
   remote = false,
   total: totalProp,
   loading = false,
+  sort: sortProp,
+  defaultSort = null,
+  onSortChange,
 }: VirtualGridProps) {
   const [scrollTop, setScrollTop] = useState(0);
   const [headerHeight, setHeaderHeight] = useState(0);
@@ -466,6 +478,9 @@ export function VirtualGrid({
   const [uncontrolledEditingRowKey, setUncontrolledEditingRowKey] = useState<
     string | null
   >(defaultEditingRowKey);
+  const [uncontrolledSort, setUncontrolledSort] = useState<SortState | null>(
+    defaultSort,
+  );
   const [editingCell, setEditingCell] = useState<{
     rowKey: string;
     field: string;
@@ -479,6 +494,7 @@ export function VirtualGrid({
   const expandedKeys = expandedKeysProp ?? uncontrolledExpandedKeys;
   const expandedRowKeys = expandedRowKeysProp ?? uncontrolledExpandedRowKeys;
   const editingRowKey = editingRowKeyProp ?? uncontrolledEditingRowKey;
+  const sort = sortProp !== undefined ? sortProp : uncontrolledSort;
 
   const showExpandCol = expandable !== undefined && expandable !== false;
   const showRowActions = editMode === "row";
@@ -502,6 +518,14 @@ export function VirtualGrid({
   function commitEditingRowKey(next: string | null) {
     if (editingRowKeyProp === undefined) setUncontrolledEditingRowKey(next);
     onEditingRowKeyChange?.(next);
+  }
+
+  function commitSort(next: SortState | null) {
+    if (sortProp === undefined) setUncontrolledSort(next);
+    onSortChange?.(next);
+    if (pagination && !remote) {
+      setPage(1);
+    }
   }
 
   function setPage(next: number) {
@@ -528,17 +552,27 @@ export function VirtualGrid({
   const headerRows = useMemo(() => buildHeaderRows(columns), [columns]);
   const headerDepth = Math.max(1, headerRows.length);
 
+  const sortedSource = useMemo(() => {
+    const source = tree ? treeData : data;
+    if (remote || !sort) return source;
+    const column = leafColumns.find((col) => col.field === sort.field);
+    return sortRows(source, sort, {
+      compare: column?.sorter,
+      childrenField: tree ? childrenField : undefined,
+    });
+  }, [tree, treeData, data, remote, sort, leafColumns, childrenField]);
+
   const treeFlat = useMemo(
     () =>
       tree
         ? flattenTree({
-            data: treeData,
+            data: sortedSource,
             idField,
             childrenField,
             expandedKeys,
           })
         : null,
-    [tree, treeData, idField, childrenField, expandedKeys],
+    [tree, sortedSource, idField, childrenField, expandedKeys],
   );
 
   const treeMetaByKey = useMemo(() => {
@@ -556,8 +590,8 @@ export function VirtualGrid({
         dataIndex,
       }));
     }
-    return buildGroupedRows(data, groupBy);
-  }, [tree, treeFlat, data, groupBy]);
+    return buildGroupedRows(sortedSource, groupBy);
+  }, [tree, treeFlat, sortedSource, groupBy]);
 
   const pagedBaseRows = useMemo(
     () =>
@@ -991,11 +1025,44 @@ export function VirtualGrid({
     return wrapEditable(content);
   }
 
-  function renderHeaderCell(column: VirtualGridColumn): ReactNode {
+  function renderHeaderLabel(column: VirtualGridColumn): ReactNode {
     const ctx: VirtualGridHeaderContext = { column };
     if (column.renderHeader) return column.renderHeader(ctx);
     if (renderHeader) return renderHeader(ctx);
     return column.title;
+  }
+
+  function isLeafSortable(column: VirtualGridColumn): boolean {
+    return !!column.sortable && !(column.children && column.children.length > 0);
+  }
+
+  function headerAriaSort(
+    column: VirtualGridColumn | undefined,
+  ): "none" | "ascending" | "descending" | undefined {
+    if (!column || !isLeafSortable(column)) return undefined;
+    if (sort?.field === column.field) {
+      return sort.order === "asc" ? "ascending" : "descending";
+    }
+    return "none";
+  }
+
+  function renderHeaderCell(column: VirtualGridColumn): ReactNode {
+    const label = renderHeaderLabel(column);
+    if (!isLeafSortable(column)) return label;
+    const indicator =
+      sort?.field === column.field ? (sort.order === "asc" ? "↑" : "↓") : "↕";
+    return (
+      <button
+        type="button"
+        className="inline-flex min-w-0 items-center gap-1 text-left"
+        onClick={() => commitSort(nextSortState(sort, column.field))}
+      >
+        <span className="truncate">{label}</span>
+        <span aria-hidden className="shrink-0 text-xs text-slate-400">
+          {indicator}
+        </span>
+      </button>
+    );
   }
 
   function layoutItemForColumn(
@@ -1537,6 +1604,7 @@ export function VirtualGrid({
                 key={key}
                 role="columnheader"
                 className={cellClass(false)}
+                aria-sort={headerAriaSort(cell.column as VirtualGridColumn)}
                 style={{
                   gridColumn,
                   gridRow,

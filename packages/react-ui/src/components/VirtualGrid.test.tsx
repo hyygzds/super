@@ -485,3 +485,164 @@ describe("VirtualGrid (React) P5 edit / remote", () => {
     expect(screen.getByText("共 100 条")).toBeInTheDocument();
   });
 });
+
+const sortColumns: VirtualGridColumn[] = [
+  { field: "id", title: "标识", width: 80 },
+  { field: "name", title: "名称", sortable: true },
+  { field: "age", title: "年龄", sortable: true },
+];
+
+const sortRowsData = [
+  { id: "1", name: "Charlie", age: 30 },
+  { id: "2", name: "Alice", age: 20 },
+  { id: "3", name: "Bob", age: 25 },
+];
+
+describe("VirtualGrid (React) sort", () => {
+  it("cycles a sortable header none → asc → desc → none and reorders rows", async () => {
+    const user = userEvent.setup();
+    const onSortChange = vi.fn();
+    render(
+      <VirtualGrid
+        columns={sortColumns}
+        data={sortRowsData}
+        onSortChange={onSortChange}
+      />,
+    );
+
+    const nameHeader = screen.getByRole("columnheader", { name: "名称" });
+    expect(nameHeader).toHaveAttribute("aria-sort", "none");
+
+    const names = () =>
+      screen
+        .getAllByRole("row")
+        .slice(1)
+        .map((row) => within(row).getAllByRole("cell")[1].textContent);
+
+    expect(names()).toEqual(["Charlie", "Alice", "Bob"]);
+
+    await user.click(within(nameHeader).getByRole("button", { name: "名称" }));
+    expect(onSortChange).toHaveBeenLastCalledWith({
+      field: "name",
+      order: "asc",
+    });
+    expect(nameHeader).toHaveAttribute("aria-sort", "ascending");
+    expect(names()).toEqual(["Alice", "Bob", "Charlie"]);
+
+    await user.click(within(nameHeader).getByRole("button", { name: "名称" }));
+    expect(onSortChange).toHaveBeenLastCalledWith({
+      field: "name",
+      order: "desc",
+    });
+    expect(nameHeader).toHaveAttribute("aria-sort", "descending");
+    expect(names()).toEqual(["Charlie", "Bob", "Alice"]);
+
+    await user.click(within(nameHeader).getByRole("button", { name: "名称" }));
+    expect(onSortChange).toHaveBeenLastCalledWith(null);
+    expect(nameHeader).toHaveAttribute("aria-sort", "none");
+    expect(names()).toEqual(["Charlie", "Alice", "Bob"]);
+  });
+
+  it("honors controlled sort and does not reorder when the parent ignores onSortChange", async () => {
+    const user = userEvent.setup();
+    const onSortChange = vi.fn();
+    render(
+      <VirtualGrid
+        columns={sortColumns}
+        data={sortRowsData}
+        sort={{ field: "name", order: "desc" }}
+        onSortChange={onSortChange}
+      />,
+    );
+
+    const names = () =>
+      screen
+        .getAllByRole("row")
+        .slice(1)
+        .map((row) => within(row).getAllByRole("cell")[1].textContent);
+
+    expect(names()).toEqual(["Charlie", "Bob", "Alice"]);
+    expect(screen.getByRole("columnheader", { name: "名称" })).toHaveAttribute(
+      "aria-sort",
+      "descending",
+    );
+
+    await user.click(
+      within(screen.getByRole("columnheader", { name: "名称" })).getByRole(
+        "button",
+        { name: "名称" },
+      ),
+    );
+    expect(onSortChange).toHaveBeenCalledWith(null);
+    expect(names()).toEqual(["Charlie", "Bob", "Alice"]);
+  });
+
+  it("resets local pagination to page 1 when the sort field changes", async () => {
+    const user = userEvent.setup();
+    const onPageChange = vi.fn();
+    render(
+      <VirtualGrid
+        columns={sortColumns}
+        data={[
+          { id: "1", name: "Zed", age: 1 },
+          { id: "2", name: "Yan", age: 2 },
+          { id: "3", name: "Abe", age: 3 },
+        ]}
+        pagination
+        pageSize={2}
+        onPageChange={onPageChange}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "下一页" }));
+    expect(screen.getByText("Abe")).toBeInTheDocument();
+    expect(screen.queryByText("Zed")).not.toBeInTheDocument();
+
+    await user.click(
+      within(screen.getByRole("columnheader", { name: "名称" })).getByRole(
+        "button",
+        { name: "名称" },
+      ),
+    );
+
+    expect(onPageChange).toHaveBeenLastCalledWith(1);
+    expect(screen.getByText("Abe")).toBeInTheDocument();
+    expect(screen.getByText("Yan")).toBeInTheDocument();
+    expect(screen.queryByText("Zed")).not.toBeInTheDocument();
+  });
+
+  it("does not reorder local rows when remote is enabled", async () => {
+    const user = userEvent.setup();
+    const onSortChange = vi.fn();
+    render(
+      <VirtualGrid
+        columns={sortColumns}
+        data={sortRowsData}
+        remote
+        onSortChange={onSortChange}
+      />,
+    );
+
+    const names = () =>
+      screen
+        .getAllByRole("row")
+        .slice(1)
+        .map((row) => within(row).getAllByRole("cell")[1].textContent);
+
+    await user.click(
+      within(screen.getByRole("columnheader", { name: "名称" })).getByRole(
+        "button",
+        { name: "名称" },
+      ),
+    );
+    expect(onSortChange).toHaveBeenCalledWith({ field: "name", order: "asc" });
+    expect(names()).toEqual(["Charlie", "Alice", "Bob"]);
+  });
+
+  it("does not add a sort button on columns without sortable", () => {
+    render(<VirtualGrid columns={sortColumns} data={sortRowsData} />);
+    const idHeader = screen.getByRole("columnheader", { name: "标识" });
+    expect(within(idHeader).queryByRole("button")).not.toBeInTheDocument();
+    expect(idHeader).not.toHaveAttribute("aria-sort");
+  });
+});

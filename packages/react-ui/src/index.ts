@@ -37,6 +37,7 @@ export type {
   VirtualGridHeaderContext,
   VirtualGridExpandedRowContext,
   GroupByConfig,
+  SortState,
   SpanMethod,
 } from "./components/VirtualGrid";
 export { Form, FormItem, FormList } from "./components/Form";

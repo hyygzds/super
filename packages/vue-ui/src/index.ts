@@ -26,6 +26,7 @@ export type {
   VirtualGridEditMode,
   VirtualGridHeaderContext,
   VirtualGridExpandContext,
+  SortState,
 } from "./components/VirtualGrid";
 export { Transfer } from "./components/Transfer";
 export type { TransferProps, TransferItem } from "./components/Transfer";

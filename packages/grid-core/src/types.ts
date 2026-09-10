@@ -90,3 +90,12 @@ export type SpanMethod = (ctx: {
   rowIndex: number;
   columnIndex: number;
 }) => { rowspan?: number; colspan?: number } | void | undefined;
+
+export type SortOrder = "asc" | "desc";
+
+export type SortState = {
+  field: string;
+  order: SortOrder;
+};
+
+export type SortCompare = (a: unknown, b: unknown) => number;
