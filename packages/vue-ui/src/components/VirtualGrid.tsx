@@ -126,6 +126,12 @@ function colWidth(col: VirtualGridColumn, forcePx: boolean): number | null {
   return null;
 }
 
+function overflowTitle(value: unknown): string | undefined {
+  if (value == null) return undefined;
+  const text = String(value);
+  return text === "" ? undefined : text;
+}
+
 function buildLayout(
   visibleColumns: VirtualGridColumn[],
   selectable: boolean,
@@ -1238,6 +1244,7 @@ export const VirtualGrid = defineComponent({
                 role="cell"
                 class={cellClass(props.autoHeight)}
                 style={stickyStyle(item, false, rowBg)}
+                title={overflowTitle(display.row[item.column.field])}
                 onDblclick={
                   canEditCell
                     ? () => beginCellEdit(key, item.column, display.row)
@@ -1384,6 +1391,7 @@ export const VirtualGrid = defineComponent({
                 ...sticky,
                 background: sticky?.background ?? rowBg,
               }}
+              title={overflowTitle(display.row[column.field])}
               onDblclick={
                 canEditCell
                   ? () => beginCellEdit(key, column, display.row)
@@ -1550,6 +1558,7 @@ export const VirtualGrid = defineComponent({
                       gridRow,
                       ...sticky,
                     }}
+                    title={overflowTitle(cell.title)}
                   >
                     {cell.column
                       ? renderHeaderCell(cell.column)

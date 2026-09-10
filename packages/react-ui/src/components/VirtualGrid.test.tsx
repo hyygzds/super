@@ -466,6 +466,47 @@ describe("VirtualGrid (React) P5 edit / remote", () => {
     expect(onRowSave).toHaveBeenCalledWith({ id: "1", name: "Gamma" });
   });
 
+  it("exposes overflowing cell and header text via title so the full value can be read", () => {
+    const longName =
+      "这是一段会被列宽截断的超长单元格内容，需要通过悬停查看完整文本";
+    const longHeader = "超长表头标题会被截断";
+    render(
+      <VirtualGrid
+        columns={[
+          { field: "id", title: "标识", width: 80 },
+          { field: "name", title: longHeader, width: 80 },
+        ]}
+        data={[{ id: "1", name: longName }]}
+      />,
+    );
+
+    const nameCell = screen.getByText(longName).closest("[role='cell']");
+    expect(nameCell).toHaveAttribute("title", longName);
+    expect(
+      screen.getByRole("columnheader", { name: longHeader }),
+    ).toHaveAttribute("title", longHeader);
+  });
+
+  it("still exposes the raw cell value on title when a custom cell renderer is used", () => {
+    const longName = "自定义渲染后仍然需要能读到被截断的原始值";
+    render(
+      <VirtualGrid
+        columns={[
+          {
+            field: "name",
+            title: "名称",
+            width: 80,
+            render: ({ value }) => <strong>{String(value)}</strong>,
+          },
+        ]}
+        data={[{ id: "1", name: longName }]}
+      />,
+    );
+
+    const nameCell = screen.getByText(longName).closest("[role='cell']");
+    expect(nameCell).toHaveAttribute("title", longName);
+  });
+
   it("remote+pagination does not slice and shows total", () => {
     render(
       <VirtualGrid

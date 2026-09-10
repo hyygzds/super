@@ -469,6 +469,49 @@ describe("VirtualGrid (Vue) P5 edit / remote", () => {
     expect(wrapper.emitted("update:editingRowKey")?.[0]).toEqual([null]);
   });
 
+  it("exposes overflowing cell and header text via title so the full value can be read", () => {
+    const longName =
+      "这是一段会被列宽截断的超长单元格内容，需要通过悬停查看完整文本";
+    const longHeader = "超长表头标题会被截断";
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: [
+          { field: "id", title: "标识", width: 80 },
+          { field: "name", title: longHeader, width: 80 },
+        ],
+        data: [{ id: "1", name: longName }],
+      },
+    });
+
+    const nameCell = wrapper
+      .findAll('[role="cell"]')
+      .find((cell) => cell.text() === longName);
+    expect(nameCell?.attributes("title")).toBe(longName);
+    const header = wrapper
+      .findAll('[role="columnheader"]')
+      .find((cell) => cell.text() === longHeader);
+    expect(header?.attributes("title")).toBe(longHeader);
+  });
+
+  it("still exposes the raw cell value on title when a custom cell slot is used", () => {
+    const longName = "自定义渲染后仍然需要能读到被截断的原始值";
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: [{ field: "name", title: "名称", width: 80 }],
+        data: [{ id: "1", name: longName }],
+      },
+      slots: {
+        cell: ({ value }: { value: unknown }) =>
+          h("strong", String(value ?? "")),
+      },
+    });
+
+    const nameCell = wrapper
+      .findAll('[role="cell"]')
+      .find((cell) => cell.text() === longName);
+    expect(nameCell?.attributes("title")).toBe(longName);
+  });
+
   it("does not slice data when remote pagination is enabled", () => {
     const pageData = makeRows(3).map((r, i) => ({
       ...r,
