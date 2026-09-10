@@ -29,6 +29,8 @@ export type {
 } from "./components/VirtualGrid";
 export { Transfer } from "./components/Transfer";
 export type { TransferProps, TransferItem } from "./components/Transfer";
+export { Tooltip } from "./components/Tooltip";
+export type { TooltipProps } from "./components/Tooltip";
 export { Form, FormItem, FormList } from "./components/Form";
 export type {
   FormProps,

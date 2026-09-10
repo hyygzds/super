@@ -50,6 +50,8 @@ export type {
 } from "./components/Form";
 export { Transfer } from "./components/Transfer";
 export type { TransferProps, TransferItem } from "./components/Transfer";
+export { Tooltip } from "./components/Tooltip";
+export type { TooltipProps } from "./components/Tooltip";
 export { Input } from "./components/Input";
 export type { InputProps } from "./components/Input";
 export { InputNumber } from "./components/InputNumber";

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { VirtualGrid, type VirtualGridColumn } from "./VirtualGrid";
@@ -483,5 +483,113 @@ describe("VirtualGrid (React) P5 edit / remote", () => {
     expect(screen.getByText("Row 1")).toBeInTheDocument();
     expect(screen.getByText("Row 3")).toBeInTheDocument();
     expect(screen.getByText("共 100 条")).toBeInTheDocument();
+  });
+});
+
+describe("VirtualGrid (React) overflow tooltip", () => {
+  beforeEach(() => {
+    Object.defineProperty(HTMLElement.prototype, "scrollWidth", {
+      configurable: true,
+      get() {
+        return 240;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+      configurable: true,
+      get() {
+        return 80;
+      },
+    });
+  });
+
+  it("shows a tooltip with the full cell text when hovering a truncated cell", async () => {
+    const user = userEvent.setup();
+    const longNote = "这是一段很长的单元格内容，默认会被截断无法直接看完";
+    render(
+      <VirtualGrid
+        columns={[
+          { field: "id", title: "标识", width: 80 },
+          { field: "note", title: "备注", width: 80 },
+        ]}
+        data={[{ id: "1", note: longNote }]}
+      />,
+    );
+
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    await user.hover(screen.getByText(longNote));
+    expect(screen.getByRole("tooltip")).toHaveTextContent(longNote);
+  });
+
+  it("does not show an overflow tooltip when showOverflowTooltip is false", async () => {
+    const user = userEvent.setup();
+    const longNote = "关闭溢出提示后不应弹出完整内容";
+    render(
+      <VirtualGrid
+        columns={[
+          { field: "id", title: "标识", width: 80 },
+          { field: "note", title: "备注", width: 80 },
+        ]}
+        data={[{ id: "1", note: longNote }]}
+        showOverflowTooltip={false}
+      />,
+    );
+
+    await user.hover(screen.getByText(longNote));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("does not show an overflow tooltip when autoHeight wraps the cell", async () => {
+    const user = userEvent.setup();
+    const longNote = "自动行高时内容已完整展示，不必再弹出提示";
+    render(
+      <VirtualGrid
+        columns={[
+          { field: "id", title: "标识", width: 80 },
+          { field: "note", title: "备注", width: 160 },
+        ]}
+        data={[{ id: "1", note: longNote }]}
+        autoHeight
+      />,
+    );
+
+    await user.hover(screen.getByText(longNote));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("honors a column-level showOverflowTooltip override", async () => {
+    const user = userEvent.setup();
+    const longNote = "列级关闭后这条备注不应弹出提示";
+    render(
+      <VirtualGrid
+        columns={[
+          { field: "id", title: "标识", width: 80 },
+          { field: "note", title: "备注", width: 80, showOverflowTooltip: false },
+        ]}
+        data={[{ id: "1", note: longNote }]}
+      />,
+    );
+
+    await user.hover(screen.getByText(longNote));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("does not wrap custom cell renders with an overflow tooltip", async () => {
+    const user = userEvent.setup();
+    render(
+      <VirtualGrid
+        columns={[
+          {
+            field: "note",
+            title: "备注",
+            width: 80,
+            render: ({ value }) => <button type="button">{String(value)}</button>,
+          },
+        ]}
+        data={[{ id: "1", note: "自定义渲染" }]}
+      />,
+    );
+
+    await user.hover(screen.getByRole("button", { name: "自定义渲染" }));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 });
