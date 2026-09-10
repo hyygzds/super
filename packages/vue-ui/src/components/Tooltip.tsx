@@ -2,14 +2,36 @@ import {
   Teleport,
   computed,
   defineComponent,
+  nextTick,
   ref,
+  useId,
   watch,
   type CSSProperties,
   type PropType,
 } from "vue";
 
+export type TooltipProps = {
+  content?: string | number;
+  disabled?: boolean;
+  open?: boolean;
+  defaultOpen?: boolean;
+  onlyIfOverflow?: boolean;
+  class?: string;
+};
+
+function isOverflowing(node: HTMLElement): boolean {
+  return (
+    node.scrollWidth - node.clientWidth > 1 ||
+    node.scrollHeight - node.clientHeight > 1
+  );
+}
+
 function positionStyle(rect: DOMRect): CSSProperties {
-  const left = rect.left + rect.width / 2;
+  const half = 160;
+  const left = Math.min(
+    Math.max(rect.left + rect.width / 2, half + 8),
+    Math.max(window.innerWidth - half - 8, half + 8),
+  );
   if (rect.top < 48) {
     return {
       top: `${rect.bottom + 8}px`,
@@ -31,6 +53,7 @@ export const Tooltip = defineComponent({
     disabled: { type: Boolean, default: false },
     open: { type: Boolean, default: undefined },
     defaultOpen: { type: Boolean, default: false },
+    onlyIfOverflow: { type: Boolean, default: false },
     class: { type: String, default: "" },
   },
   emits: {
@@ -38,6 +61,7 @@ export const Tooltip = defineComponent({
   },
   setup(props, { emit, slots }) {
     const triggerRef = ref<HTMLElement | null>(null);
+    const tooltipId = `tooltip-${useId()}`;
     const internalOpen = ref(props.defaultOpen);
     const coords = ref<CSSProperties>({});
     const isControlled = computed(() => props.open !== undefined);
@@ -53,14 +77,29 @@ export const Tooltip = defineComponent({
       emit("update:open", next);
     }
 
+    function tryOpen() {
+      if (
+        props.onlyIfOverflow &&
+        triggerRef.value &&
+        !isOverflowing(triggerRef.value)
+      ) {
+        return;
+      }
+      commitOpen(true);
+    }
+
     function syncPosition() {
       if (!triggerRef.value) return;
       coords.value = positionStyle(triggerRef.value.getBoundingClientRect());
     }
 
-    watch(currentOpen, (open) => {
-      if (open) syncPosition();
-    });
+    watch(
+      currentOpen,
+      (open) => {
+        if (open) void nextTick(syncPosition);
+      },
+      { immediate: true },
+    );
 
     return () => {
       if (props.disabled || !hasContent.value) {
@@ -70,14 +109,24 @@ export const Tooltip = defineComponent({
       return (
         <span
           ref={triggerRef}
-          class={`inline-flex min-w-0 max-w-full ${props.class}`.trim()}
-          onMouseenter={() => commitOpen(true)}
+          class={`block min-w-0 max-w-full truncate ${props.class}`.trim()}
+          aria-describedby={currentOpen.value ? tooltipId : undefined}
+          onMouseenter={tryOpen}
           onMouseleave={() => commitOpen(false)}
+          onFocus={tryOpen}
+          onBlur={() => commitOpen(false)}
+          onKeydown={(event: KeyboardEvent) => {
+            if (event.key === "Escape" && currentOpen.value) {
+              event.stopPropagation();
+              commitOpen(false);
+            }
+          }}
         >
           {slots.default?.()}
           {currentOpen.value ? (
             <Teleport to="body">
               <div
+                id={tooltipId}
                 role="tooltip"
                 class="pointer-events-none fixed z-[1000] max-w-sm rounded-md bg-slate-900 px-2.5 py-1.5 text-xs leading-5 text-white shadow-lg whitespace-pre-wrap break-words"
                 style={coords.value}

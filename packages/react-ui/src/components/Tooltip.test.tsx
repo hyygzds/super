@@ -35,6 +35,30 @@ describe("Tooltip (React)", () => {
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
+  it("skips opening when onlyIfOverflow and the trigger is not overflowing", async () => {
+    const user = userEvent.setup();
+    Object.defineProperty(HTMLElement.prototype, "scrollWidth", {
+      configurable: true,
+      get() {
+        return 40;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+      configurable: true,
+      get() {
+        return 80;
+      },
+    });
+    render(
+      <Tooltip content="完整内容" onlyIfOverflow>
+        <span>短文本</span>
+      </Tooltip>,
+    );
+
+    await user.hover(screen.getByText("短文本"));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
   it("does not open when disabled", async () => {
     const user = userEvent.setup();
     render(

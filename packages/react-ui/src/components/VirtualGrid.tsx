@@ -970,16 +970,18 @@ export function VirtualGrid({
       );
     };
 
+    const usedCustom = Boolean(column.render) || Boolean(renderCell);
     const wrapOverflow = (node: ReactNode) => {
       const text = overflowTooltipText(value);
       if (
+        usedCustom ||
         !shouldShowOverflowTooltip(column, showOverflowTooltip, autoHeight) ||
         !text
       ) {
         return node;
       }
       return (
-        <Tooltip content={text} className="min-w-0 w-full">
+        <Tooltip content={text} onlyIfOverflow className="min-w-0 w-full">
           {node}
         </Tooltip>
       );

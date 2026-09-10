@@ -37,6 +37,31 @@ describe("Tooltip (Vue)", () => {
     wrapper.unmount();
   });
 
+  it("skips opening when onlyIfOverflow and the trigger is not overflowing", async () => {
+    Object.defineProperty(HTMLElement.prototype, "scrollWidth", {
+      configurable: true,
+      get() {
+        return 40;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+      configurable: true,
+      get() {
+        return 80;
+      },
+    });
+    const wrapper = mount(Tooltip, {
+      props: { content: "完整内容", onlyIfOverflow: true },
+      slots: { default: () => "短文本" },
+      attachTo: document.body,
+    });
+
+    await wrapper.trigger("mouseenter");
+    expect(document.body.querySelector('[role="tooltip"]')).toBeNull();
+
+    wrapper.unmount();
+  });
+
   it("does not open when disabled", async () => {
     const wrapper = mount(Tooltip, {
       props: { content: "提示", disabled: true },

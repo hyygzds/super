@@ -1,8 +1,10 @@
 import {
+  useId,
   useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
+  type KeyboardEvent,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
@@ -14,11 +16,23 @@ export type TooltipProps = {
   open?: boolean;
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
+  onlyIfOverflow?: boolean;
   className?: string;
 };
 
+function isOverflowing(node: HTMLElement): boolean {
+  return (
+    node.scrollWidth - node.clientWidth > 1 ||
+    node.scrollHeight - node.clientHeight > 1
+  );
+}
+
 function positionStyle(rect: DOMRect): CSSProperties {
-  const left = rect.left + rect.width / 2;
+  const half = 160;
+  const left = Math.min(
+    Math.max(rect.left + rect.width / 2, half + 8),
+    Math.max(window.innerWidth - half - 8, half + 8),
+  );
   if (rect.top < 48) {
     return {
       top: rect.bottom + 8,
@@ -40,9 +54,11 @@ export function Tooltip({
   open: openProp,
   defaultOpen = false,
   onOpenChange,
+  onlyIfOverflow = false,
   className = "",
 }: TooltipProps) {
   const triggerRef = useRef<HTMLSpanElement>(null);
+  const tooltipId = useId();
   const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
   const [coords, setCoords] = useState<CSSProperties>({});
   const open = openProp ?? uncontrolledOpen;
@@ -53,10 +69,28 @@ export function Tooltip({
     onOpenChange?.(next);
   }
 
+  function tryOpen() {
+    if (
+      onlyIfOverflow &&
+      triggerRef.current &&
+      !isOverflowing(triggerRef.current)
+    ) {
+      return;
+    }
+    commitOpen(true);
+  }
+
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) return;
     setCoords(positionStyle(triggerRef.current.getBoundingClientRect()));
   }, [open]);
+
+  function onKeyDown(event: KeyboardEvent<HTMLSpanElement>) {
+    if (event.key === "Escape" && open) {
+      event.stopPropagation();
+      commitOpen(false);
+    }
+  }
 
   if (disabled || !hasContent) {
     return <>{children}</>;
@@ -65,14 +99,19 @@ export function Tooltip({
   return (
     <span
       ref={triggerRef}
-      className={`inline-flex min-w-0 max-w-full ${className}`.trim()}
-      onMouseEnter={() => commitOpen(true)}
+      className={`block min-w-0 max-w-full truncate ${className}`.trim()}
+      aria-describedby={open ? tooltipId : undefined}
+      onMouseEnter={tryOpen}
       onMouseLeave={() => commitOpen(false)}
+      onFocus={tryOpen}
+      onBlur={() => commitOpen(false)}
+      onKeyDown={onKeyDown}
     >
       {children}
       {open
         ? createPortal(
             <div
+              id={tooltipId}
               role="tooltip"
               className="pointer-events-none fixed z-[1000] max-w-sm rounded-md bg-slate-900 px-2.5 py-1.5 text-xs leading-5 text-white shadow-lg whitespace-pre-wrap break-words"
               style={coords}

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { VirtualGrid, type VirtualGridColumn } from "./VirtualGrid";
@@ -487,6 +487,21 @@ describe("VirtualGrid (React) P5 edit / remote", () => {
 });
 
 describe("VirtualGrid (React) overflow tooltip", () => {
+  beforeEach(() => {
+    Object.defineProperty(HTMLElement.prototype, "scrollWidth", {
+      configurable: true,
+      get() {
+        return 240;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+      configurable: true,
+      get() {
+        return 80;
+      },
+    });
+  });
+
   it("shows a tooltip with the full cell text when hovering a truncated cell", async () => {
     const user = userEvent.setup();
     const longNote = "这是一段很长的单元格内容，默认会被截断无法直接看完";
@@ -538,6 +553,43 @@ describe("VirtualGrid (React) overflow tooltip", () => {
     );
 
     await user.hover(screen.getByText(longNote));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("honors a column-level showOverflowTooltip override", async () => {
+    const user = userEvent.setup();
+    const longNote = "列级关闭后这条备注不应弹出提示";
+    render(
+      <VirtualGrid
+        columns={[
+          { field: "id", title: "标识", width: 80 },
+          { field: "note", title: "备注", width: 80, showOverflowTooltip: false },
+        ]}
+        data={[{ id: "1", note: longNote }]}
+      />,
+    );
+
+    await user.hover(screen.getByText(longNote));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("does not wrap custom cell renders with an overflow tooltip", async () => {
+    const user = userEvent.setup();
+    render(
+      <VirtualGrid
+        columns={[
+          {
+            field: "note",
+            title: "备注",
+            width: 80,
+            render: ({ value }) => <button type="button">{String(value)}</button>,
+          },
+        ]}
+        data={[{ id: "1", note: "自定义渲染" }]}
+      />,
+    );
+
+    await user.hover(screen.getByRole("button", { name: "自定义渲染" }));
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 });
