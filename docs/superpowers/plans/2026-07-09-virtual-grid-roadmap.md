@@ -52,6 +52,7 @@
 8. [`2026-08-07-virtual-grid-p4.md`](./2026-08-07-virtual-grid-p4.md) 已执行
 9. [`2026-08-10-virtual-grid-p5.md`](./2026-08-10-virtual-grid-p5.md) 已执行（编辑 / 远端分页）
 10. VirtualGrid P0–P5 已齐；剩余 Storybook 目视确认
+11. 列排序（issue #6）：[`2026-09-10-virtual-grid-sort.md`](./2026-09-10-virtual-grid-sort.md)
 
 ---
 

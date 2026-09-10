@@ -537,6 +537,131 @@ describe("VirtualGrid (Vue) P5 edit / remote", () => {
   });
 });
 
+const sortColumns: VirtualGridColumn[] = [
+  { field: "id", title: "标识", width: 80 },
+  { field: "name", title: "名称", sortable: true },
+  { field: "age", title: "年龄", sortable: true },
+];
+
+const sortRowsData = [
+  { id: "1", name: "Charlie", age: 30 },
+  { id: "2", name: "Alice", age: 20 },
+  { id: "3", name: "Bob", age: 25 },
+];
+
+function nameCells(wrapper: ReturnType<typeof mount>) {
+  return wrapper
+    .findAll('[role="row"]')
+    .slice(1)
+    .map((row) => row.findAll('[role="cell"]')[1]?.text());
+}
+
+function nameHeader(wrapper: ReturnType<typeof mount>) {
+  return wrapper
+    .findAll('[role="columnheader"]')
+    .find((h) => h.text().includes("名称"))!;
+}
+
+describe("VirtualGrid (Vue) sort", () => {
+  it("cycles a sortable header none → asc → desc → none and reorders rows", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: { columns: sortColumns, data: sortRowsData },
+    });
+
+    const header = nameHeader(wrapper);
+    expect(header.attributes("aria-sort")).toBe("none");
+    expect(nameCells(wrapper)).toEqual(["Charlie", "Alice", "Bob"]);
+
+    await header.find("button").trigger("click");
+    expect(wrapper.emitted("update:sort")?.[0]).toEqual([
+      { field: "name", order: "asc" },
+    ]);
+    expect(header.attributes("aria-sort")).toBe("ascending");
+    expect(nameCells(wrapper)).toEqual(["Alice", "Bob", "Charlie"]);
+
+    await header.find("button").trigger("click");
+    expect(wrapper.emitted("update:sort")?.[1]).toEqual([
+      { field: "name", order: "desc" },
+    ]);
+    expect(header.attributes("aria-sort")).toBe("descending");
+    expect(nameCells(wrapper)).toEqual(["Charlie", "Bob", "Alice"]);
+
+    await header.find("button").trigger("click");
+    expect(wrapper.emitted("update:sort")?.[2]).toEqual([null]);
+    expect(header.attributes("aria-sort")).toBe("none");
+    expect(nameCells(wrapper)).toEqual(["Charlie", "Alice", "Bob"]);
+  });
+
+  it("honors controlled sort and does not reorder when the parent ignores update:sort", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: sortColumns,
+        data: sortRowsData,
+        sort: { field: "name", order: "desc" },
+      },
+    });
+
+    expect(nameCells(wrapper)).toEqual(["Charlie", "Bob", "Alice"]);
+    expect(nameHeader(wrapper).attributes("aria-sort")).toBe("descending");
+
+    await nameHeader(wrapper).find("button").trigger("click");
+    expect(wrapper.emitted("update:sort")?.[0]).toEqual([null]);
+    expect(nameCells(wrapper)).toEqual(["Charlie", "Bob", "Alice"]);
+  });
+
+  it("resets local pagination to page 1 when the sort field changes", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: sortColumns,
+        data: [
+          { id: "1", name: "Zed", age: 1 },
+          { id: "2", name: "Yan", age: 2 },
+          { id: "3", name: "Abe", age: 3 },
+        ],
+        pagination: true,
+        pageSize: 2,
+      },
+    });
+
+    await wrapper.find('button[aria-label="下一页"]').trigger("click");
+    expect(wrapper.text()).toContain("Abe");
+    expect(wrapper.text()).not.toContain("Zed");
+
+    await nameHeader(wrapper).find("button").trigger("click");
+    expect(wrapper.emitted("update:page")?.at(-1)).toEqual([1]);
+    expect(wrapper.text()).toContain("Abe");
+    expect(wrapper.text()).toContain("Yan");
+    expect(wrapper.text()).not.toContain("Zed");
+  });
+
+  it("does not reorder local rows when remote is enabled", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: sortColumns,
+        data: sortRowsData,
+        remote: true,
+      },
+    });
+
+    await nameHeader(wrapper).find("button").trigger("click");
+    expect(wrapper.emitted("update:sort")?.[0]).toEqual([
+      { field: "name", order: "asc" },
+    ]);
+    expect(nameCells(wrapper)).toEqual(["Charlie", "Alice", "Bob"]);
+  });
+
+  it("does not add a sort button on columns without sortable", () => {
+    const wrapper = mount(VirtualGrid, {
+      props: { columns: sortColumns, data: sortRowsData },
+    });
+    const idHeader = wrapper
+      .findAll('[role="columnheader"]')
+      .find((h) => h.text().includes("标识"))!;
+    expect(idHeader.find("button").exists()).toBe(false);
+    expect(idHeader.attributes("aria-sort")).toBeUndefined();
+  });
+});
+
 describe("VirtualGrid (Vue) overflow tooltip", () => {
   beforeEach(() => {
     Object.defineProperty(HTMLElement.prototype, "scrollWidth", {

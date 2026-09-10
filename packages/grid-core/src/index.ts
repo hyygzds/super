@@ -9,6 +9,9 @@ export type {
   DisplayRow,
   SpanResult,
   SpanMethod,
+  SortOrder,
+  SortState,
+  SortCompare,
 } from "./types";
 export { SelectionMode } from "./types";
 export { computeVirtualWindow } from "./virtual-window";
@@ -21,6 +24,7 @@ export {
   isIndeterminate,
 } from "./selection";
 export { flattenLeafColumns, buildHeaderRows } from "./columns";
+export { nextSortState, compareCellValues, sortRows } from "./sort";
 export { buildGroupedRows } from "./group";
 export { normalizeSpans } from "./span";
 export type { TreeFlatRow, FlattenTreeInput, CascadeSelectInput } from "./tree";

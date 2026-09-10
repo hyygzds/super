@@ -9,15 +9,19 @@ import {
   isAllSelected,
   isIndeterminate,
   isTreeIndeterminate,
+  nextSortState,
   normalizeSpans,
   selectAllKeys,
   slicePage,
+  sortRows,
   toggleExpandKey,
   toggleKey,
   type DisplayRow,
   type GridColumn,
   type GroupByConfig,
   type HeaderCell,
+  type SortCompare,
+  type SortState,
   type SpanMethod,
   type TreeFlatRow,
 } from "@component-ai/grid-core";
@@ -41,6 +45,8 @@ import { Tooltip } from "./Tooltip";
 export type VirtualGridColumn = GridColumn & {
   /** When set, overrides table-level `editable` for this column. */
   editable?: boolean;
+  sortable?: boolean;
+  sorter?: SortCompare;
   showOverflowTooltip?: boolean;
 };
 
@@ -69,7 +75,7 @@ export type VirtualGridExpandContext = {
   rowIndex: number;
 };
 
-export type { GroupByConfig, SpanMethod };
+export type { GroupByConfig, SortState, SpanMethod };
 
 const ROW_NUMBER_WIDTH = 48;
 const SELECTION_WIDTH = 40;
@@ -439,6 +445,14 @@ export const VirtualGrid = defineComponent({
     remote: { type: Boolean, default: false },
     total: { type: Number, default: undefined },
     loading: { type: Boolean, default: false },
+    sort: {
+      type: Object as PropType<SortState | null | undefined>,
+      default: undefined,
+    },
+    defaultSort: {
+      type: Object as PropType<SortState | null>,
+      default: null,
+    },
   },
   emits: {
     "update:selectedKeys": (_keys: string[]) => true,
@@ -447,6 +461,7 @@ export const VirtualGrid = defineComponent({
     "update:expandedKeys": (_keys: string[]) => true,
     "update:expandedRowKeys": (_keys: string[]) => true,
     "update:editingRowKey": (_key: string | null) => true,
+    "update:sort": (_sort: SortState | null) => true,
     cellChange: (_payload: VirtualGridCellChangePayload) => true,
     rowSave: (_row: Record<string, unknown>) => true,
     rowCancel: (_rowKey: string) => true,
@@ -469,6 +484,7 @@ export const VirtualGrid = defineComponent({
     const uncontrolledEditingRowKey = ref<string | null>(
       props.defaultEditingRowKey,
     );
+    const uncontrolledSort = ref<SortState | null>(props.defaultSort);
     const childrenCache = ref(
       new Map<string, Record<string, unknown>[]>(),
     );
@@ -498,6 +514,9 @@ export const VirtualGrid = defineComponent({
           ? props.editingRowKey
           : uncontrolledEditingRowKey.value,
     );
+    const sort = computed(() =>
+      props.sort !== undefined ? props.sort : uncontrolledSort.value,
+    );
 
     function commitSelectedKeys(next: string[]) {
       if (props.selectedKeys === undefined) uncontrolledSelectedKeys.value = next;
@@ -521,6 +540,14 @@ export const VirtualGrid = defineComponent({
         uncontrolledEditingRowKey.value = next;
       }
       emit("update:editingRowKey", next);
+    }
+
+    function commitSort(next: SortState | null) {
+      if (props.sort === undefined) uncontrolledSort.value = next;
+      emit("update:sort", next);
+      if (props.pagination && !props.remote) {
+        setPage(1);
+      }
     }
 
     function setPage(next: number) {
@@ -565,10 +592,21 @@ export const VirtualGrid = defineComponent({
       );
     });
 
+    const sortedSource = computed(() => {
+      const source = props.tree ? treeData.value : props.data;
+      const current = sort.value;
+      if (props.remote || !current) return source;
+      const column = leafColumns.value.find((col) => col.field === current.field);
+      return sortRows(source, current, {
+        compare: (column as VirtualGridColumn | undefined)?.sorter,
+        childrenField: props.tree ? props.childrenField : undefined,
+      });
+    });
+
     const baseDisplayRows = computed((): BodyRow[] => {
       if (props.tree) {
         const flat = flattenTree({
-          data: treeData.value,
+          data: sortedSource.value,
           idField: props.idField,
           childrenField: props.childrenField,
           expandedKeys: expandedKeys.value,
@@ -587,7 +625,7 @@ export const VirtualGrid = defineComponent({
           }),
         );
       }
-      return buildGroupedRows(props.data, props.groupBy);
+      return buildGroupedRows(sortedSource.value, props.groupBy);
     });
 
     const pagedBaseRows = computed(() =>
@@ -1051,12 +1089,49 @@ export const VirtualGrid = defineComponent({
       );
     }
 
-    function renderHeaderCell(column: VirtualGridColumn) {
+    function renderHeaderLabel(column: VirtualGridColumn) {
       const ctx: VirtualGridHeaderContext = { column };
       const fieldSlot = slots[`header-${column.field}`];
       if (fieldSlot) return fieldSlot(ctx);
       if (slots.header) return slots.header(ctx);
       return column.title;
+    }
+
+    function isLeafSortable(column: VirtualGridColumn): boolean {
+      return !!column.sortable && !(column.children && column.children.length > 0);
+    }
+
+    function headerAriaSort(
+      column: VirtualGridColumn | undefined,
+    ): "none" | "ascending" | "descending" | undefined {
+      if (!column || !isLeafSortable(column)) return undefined;
+      if (sort.value?.field === column.field) {
+        return sort.value.order === "asc" ? "ascending" : "descending";
+      }
+      return "none";
+    }
+
+    function renderHeaderCell(column: VirtualGridColumn) {
+      const label = renderHeaderLabel(column);
+      if (!isLeafSortable(column)) return label;
+      const indicator =
+        sort.value?.field === column.field
+          ? sort.value.order === "asc"
+            ? "↑"
+            : "↓"
+          : "↕";
+      return (
+        <button
+          type="button"
+          class="inline-flex min-w-0 items-center gap-1 text-left"
+          onClick={() => commitSort(nextSortState(sort.value, column.field))}
+        >
+          <span class="truncate">{label}</span>
+          <span aria-hidden class="shrink-0 text-xs text-slate-400">
+            {indicator}
+          </span>
+        </button>
+      );
     }
 
     function layoutItemForColumn(column: VirtualGridColumn): LayoutCol | undefined {
@@ -1575,6 +1650,7 @@ export const VirtualGrid = defineComponent({
                     key={key}
                     role="columnheader"
                     class={cellClass(false)}
+                    aria-sort={headerAriaSort(cell.column)}
                     style={{
                       gridColumn,
                       gridRow,

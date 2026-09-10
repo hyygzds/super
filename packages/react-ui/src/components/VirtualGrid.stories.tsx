@@ -96,6 +96,27 @@ export const Pagination: Story = {
   args: { columns, data: makeRows(95), pagination: true, pageSize: 10 },
 };
 
+const sortDemoRows = [
+  { id: "1", code: "0003", name: "Charlie", fullName: "Charlie Chen" },
+  { id: "2", code: "0001", name: "Alice", fullName: "Alice Zhang" },
+  { id: "3", code: "0010", name: "Bob", fullName: "Bob Li" },
+  { id: "4", code: "0002", name: "Diana", fullName: "Diana Wang" },
+  { id: "5", code: "0008", name: "Eve", fullName: "Eve Liu" },
+];
+
+export const Sort: Story = {
+  args: {
+    columns: [
+      { field: "id", title: "标识", width: 80 },
+      { field: "code", title: "编号", width: 100, sortable: true },
+      { field: "name", title: "名称", width: 120, sortable: true },
+      { field: "fullName", title: "全称", sortable: true },
+    ],
+    data: sortDemoRows,
+    height: 280,
+  },
+};
+
 export const SelectionWithPagination: Story = {
   args: {
     columns,
