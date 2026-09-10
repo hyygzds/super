@@ -170,6 +170,32 @@ export const CellTemplate: Story = {
   ),
 };
 
+export const OverflowTooltip: Story = {
+  render: () => (
+    <VirtualGrid
+      columns={[
+        { field: "id", title: "标识", width: 64 },
+        { field: "name", title: "超长表头标题会被截断", width: 96 },
+        { field: "remark", title: "备注", width: 140 },
+      ]}
+      data={[
+        {
+          id: "1",
+          name: "这是一段会被列宽截断的超长单元格内容，悬停单元格可查看完整文本",
+          remark:
+            "备注同样可能超出列宽：采购申请已提交财务复核，等待本周内完成审批并回写单号。",
+        },
+        {
+          id: "2",
+          name: "短文本",
+          remark: "正常长度备注",
+        },
+      ]}
+      bordered
+    />
+  ),
+};
+
 export const AutoHeight: Story = {
   render: () => (
     <VirtualGrid
