@@ -114,7 +114,7 @@ export function Tooltip({
   return (
     <span
       ref={triggerRef}
-      className={`inline-flex min-w-0 max-w-full ${className}`.trim()}
+      className={`min-w-0 max-w-full ${className}`.trim()}
       aria-describedby={open ? tooltipId : undefined}
       onMouseEnter={tryOpen}
       onMouseLeave={() => commitOpen(false)}

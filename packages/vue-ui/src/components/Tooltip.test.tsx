@@ -120,6 +120,17 @@ describe("Tooltip (Vue)", () => {
     wrapper.unmount();
   });
 
+  it("lets a caller block class replace the default trigger display", () => {
+    const wrapper = mount(Tooltip, {
+      props: { content: "提示", class: "block w-full truncate" },
+      slots: { default: () => "文本" },
+    });
+    expect(wrapper.classes()).toContain("block");
+    expect(wrapper.classes()).toContain("truncate");
+    expect(wrapper.classes()).not.toContain("inline-flex");
+    wrapper.unmount();
+  });
+
   it("does not open when disabled", async () => {
     const wrapper = mount(Tooltip, {
       props: { content: "提示", disabled: true },

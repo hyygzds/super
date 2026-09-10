@@ -121,7 +121,7 @@ export const Tooltip = defineComponent({
       return (
         <span
           ref={triggerRef}
-          class={`inline-flex min-w-0 max-w-full ${props.class}`.trim()}
+          class={`min-w-0 max-w-full ${props.class}`.trim()}
           aria-describedby={currentOpen.value ? tooltipId : undefined}
           onMouseenter={tryOpen}
           onMouseleave={() => commitOpen(false)}

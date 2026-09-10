@@ -109,6 +109,18 @@ describe("Tooltip (React)", () => {
     expect(trigger?.className).not.toMatch(/\bblock\b/);
   });
 
+  it("lets a caller block class replace the default trigger display", () => {
+    render(
+      <Tooltip content="提示" className="block w-full truncate">
+        <span>文本</span>
+      </Tooltip>,
+    );
+    const trigger = screen.getByText("文本").parentElement;
+    expect(trigger?.className).toMatch(/\bblock\b/);
+    expect(trigger?.className).toMatch(/\btruncate\b/);
+    expect(trigger?.className).not.toMatch(/\binline-flex\b/);
+  });
+
   it("does not open when disabled", async () => {
     const user = userEvent.setup();
     render(
