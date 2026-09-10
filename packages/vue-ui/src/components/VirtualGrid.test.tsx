@@ -770,6 +770,22 @@ describe("VirtualGrid (Vue) filter", () => {
     });
     expect(filterHeader(wrapper, "标识").find("input").exists()).toBe(false);
   });
+
+  it("reveals matching tree descendants even when parents start collapsed", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: { columns: filterColumns, data: treeData, tree: true },
+    });
+
+    expect(wrapper.text()).toContain("Parent");
+    expect(wrapper.text()).not.toContain("Child A");
+
+    await filterInput(wrapper, "名称").setValue("Child A");
+    expect(wrapper.text()).toContain("Parent");
+    expect(wrapper.text()).toContain("Child A");
+    expect(wrapper.text()).not.toContain("Child B");
+    expect(wrapper.text()).not.toContain("Leaf");
+    expect(wrapper.emitted("update:expandedKeys")).toBeUndefined();
+  });
 });
 
 describe("VirtualGrid (Vue) overflow tooltip", () => {

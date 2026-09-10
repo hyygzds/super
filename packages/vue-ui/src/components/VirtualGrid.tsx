@@ -1,8 +1,10 @@
 import {
+  activeFilterEntries,
   buildGroupedRows,
   buildHeaderRows,
   cascadeToggleKey,
   clearKeys,
+  collectExpandableKeys,
   computeVirtualWindow,
   flattenLeafColumns,
   filterRows,
@@ -641,11 +643,21 @@ export const VirtualGrid = defineComponent({
 
     const baseDisplayRows = computed((): BodyRow[] => {
       if (props.tree) {
+        const revealKeys =
+          !props.remote && activeFilterEntries(filters.value).length > 0
+            ? collectExpandableKeys(sortedSource.value, {
+                idField: props.idField,
+                childrenField: props.childrenField,
+              })
+            : [];
         const flat = flattenTree({
           data: sortedSource.value,
           idField: props.idField,
           childrenField: props.childrenField,
-          expandedKeys: expandedKeys.value,
+          expandedKeys:
+            revealKeys.length > 0
+              ? [...new Set([...expandedKeys.value, ...revealKeys])]
+              : expandedKeys.value,
         });
         return flat.map(
           (t: TreeFlatRow, dataIndex: number): DataBodyRow => ({

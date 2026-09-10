@@ -39,6 +39,7 @@ export type { TreeFlatRow, FlattenTreeInput, CascadeSelectInput } from "./tree";
 export {
   flattenTree,
   toggleExpandKey,
+  collectExpandableKeys,
   collectDescendantKeys,
   cascadeToggleKey,
   isTreeIndeterminate,

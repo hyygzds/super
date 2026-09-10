@@ -1,8 +1,10 @@
 import {
+  activeFilterEntries,
   buildGroupedRows,
   buildHeaderRows,
   cascadeToggleKey,
   clearKeys,
+  collectExpandableKeys,
   computeVirtualWindow,
   flattenLeafColumns,
   filterRows,
@@ -632,18 +634,30 @@ export function VirtualGrid({
     childrenField,
   ]);
 
-  const treeFlat = useMemo(
-    () =>
-      tree
-        ? flattenTree({
-            data: sortedSource,
-            idField,
-            childrenField,
-            expandedKeys,
-          })
-        : null,
-    [tree, sortedSource, idField, childrenField, expandedKeys],
-  );
+  const treeFlat = useMemo(() => {
+    if (!tree) return null;
+    const revealKeys =
+      !remote && activeFilterEntries(filters).length > 0
+        ? collectExpandableKeys(sortedSource, { idField, childrenField })
+        : [];
+    return flattenTree({
+      data: sortedSource,
+      idField,
+      childrenField,
+      expandedKeys:
+        revealKeys.length > 0
+          ? [...new Set([...expandedKeys, ...revealKeys])]
+          : expandedKeys,
+    });
+  }, [
+    tree,
+    sortedSource,
+    idField,
+    childrenField,
+    expandedKeys,
+    remote,
+    filters,
+  ]);
 
   const treeMetaByKey = useMemo(() => {
     const map = new Map<string, TreeFlatRow>();
