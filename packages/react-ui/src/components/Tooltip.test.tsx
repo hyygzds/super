@@ -1,0 +1,49 @@
+import { describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { Tooltip } from "./Tooltip";
+
+describe("Tooltip (React)", () => {
+  it("shows content on hover and hides on leave", async () => {
+    const user = userEvent.setup();
+    render(
+      <Tooltip content="完整内容">
+        <span>截断文本</span>
+      </Tooltip>,
+    );
+
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    await user.hover(screen.getByText("截断文本"));
+    expect(screen.getByRole("tooltip")).toHaveTextContent("完整内容");
+
+    await user.unhover(screen.getByText("截断文本"));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("respects controlled open and reports onOpenChange", async () => {
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+    render(
+      <Tooltip content="提示" open={false} onOpenChange={onOpenChange}>
+        <span>触发</span>
+      </Tooltip>,
+    );
+
+    await user.hover(screen.getByText("触发"));
+    expect(onOpenChange).toHaveBeenCalledWith(true);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("does not open when disabled", async () => {
+    const user = userEvent.setup();
+    render(
+      <Tooltip content="提示" disabled>
+        <span>触发</span>
+      </Tooltip>,
+    );
+
+    await user.hover(screen.getByText("触发"));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+});

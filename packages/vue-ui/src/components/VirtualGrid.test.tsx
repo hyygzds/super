@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { h } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
+import { Tooltip } from "./Tooltip";
 import { VirtualGrid } from "./VirtualGrid";
 import type { VirtualGridColumn } from "./VirtualGrid";
 
@@ -490,5 +491,79 @@ describe("VirtualGrid (Vue) P5 edit / remote", () => {
     expect(wrapper.text()).toContain("Remote 11");
     expect(wrapper.text()).toContain("共 100 条");
     expect(wrapper.text()).not.toContain("Row 1");
+  });
+});
+
+describe("VirtualGrid (Vue) overflow tooltip", () => {
+  it("shows a tooltip with the full cell text when hovering a truncated cell", async () => {
+    const longNote = "这是一段很长的单元格内容，默认会被截断无法直接看完";
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: [
+          { field: "id", title: "标识", width: 80 },
+          { field: "note", title: "备注", width: 80 },
+        ],
+        data: [{ id: "1", note: longNote }],
+      },
+      attachTo: document.body,
+    });
+
+    expect(document.body.querySelector('[role="tooltip"]')).toBeNull();
+    const cell = wrapper
+      .findAll('[role="cell"]')
+      .find((item) => item.text().includes(longNote));
+    expect(cell).toBeTruthy();
+    await cell!.findComponent(Tooltip).trigger("mouseenter");
+    expect(document.body.querySelector('[role="tooltip"]')?.textContent).toBe(
+      longNote,
+    );
+
+    wrapper.unmount();
+  });
+
+  it("does not show an overflow tooltip when showOverflowTooltip is false", async () => {
+    const longNote = "关闭溢出提示后不应弹出完整内容";
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: [
+          { field: "id", title: "标识", width: 80 },
+          { field: "note", title: "备注", width: 80 },
+        ],
+        data: [{ id: "1", note: longNote }],
+        showOverflowTooltip: false,
+      },
+      attachTo: document.body,
+    });
+
+    const cell = wrapper
+      .findAll('[role="cell"]')
+      .find((item) => item.text().includes(longNote));
+    await cell!.trigger("mouseenter");
+    expect(document.body.querySelector('[role="tooltip"]')).toBeNull();
+
+    wrapper.unmount();
+  });
+
+  it("does not show an overflow tooltip when autoHeight wraps the cell", async () => {
+    const longNote = "自动行高时内容已完整展示，不必再弹出提示";
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: [
+          { field: "id", title: "标识", width: 80 },
+          { field: "note", title: "备注", width: 160 },
+        ],
+        data: [{ id: "1", note: longNote }],
+        autoHeight: true,
+      },
+      attachTo: document.body,
+    });
+
+    const cell = wrapper
+      .findAll('[role="cell"]')
+      .find((item) => item.text().includes(longNote));
+    await cell!.trigger("mouseenter");
+    expect(document.body.querySelector('[role="tooltip"]')).toBeNull();
+
+    wrapper.unmount();
   });
 });
