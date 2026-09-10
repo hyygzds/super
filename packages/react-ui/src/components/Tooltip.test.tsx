@@ -74,6 +74,41 @@ describe("Tooltip (React)", () => {
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 
+  it("opens onlyIfOverflow when a nested truncated child overflows", async () => {
+    const user = userEvent.setup();
+    Object.defineProperty(HTMLElement.prototype, "scrollWidth", {
+      configurable: true,
+      get() {
+        return (this as HTMLElement).dataset.overflow === "true" ? 240 : 80;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+      configurable: true,
+      get() {
+        return 80;
+      },
+    });
+    render(
+      <Tooltip content="完整内容" onlyIfOverflow>
+        <span data-overflow="true">很长的嵌套文本</span>
+      </Tooltip>,
+    );
+
+    await user.hover(screen.getByText("很长的嵌套文本"));
+    expect(screen.getByRole("tooltip")).toHaveTextContent("完整内容");
+  });
+
+  it("does not force block or truncate layout on the trigger", () => {
+    render(
+      <Tooltip content="提示">
+        <button type="button">按钮</button>
+      </Tooltip>,
+    );
+    const trigger = screen.getByRole("button", { name: "按钮" }).parentElement;
+    expect(trigger?.className).not.toMatch(/\btruncate\b/);
+    expect(trigger?.className).not.toMatch(/\bblock\b/);
+  });
+
   it("does not open when disabled", async () => {
     const user = userEvent.setup();
     render(

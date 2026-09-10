@@ -21,9 +21,13 @@ export type TooltipProps = {
 };
 
 function isOverflowing(node: HTMLElement): boolean {
-  return (
-    node.scrollWidth - node.clientWidth > 1 ||
-    node.scrollHeight - node.clientHeight > 1
+  const nested = Array.from(node.querySelectorAll("*")).filter(
+    (el): el is HTMLElement => el instanceof HTMLElement,
+  );
+  return [node, ...nested].some(
+    (el) =>
+      el.scrollWidth - el.clientWidth > 1 ||
+      el.scrollHeight - el.clientHeight > 1,
   );
 }
 
@@ -110,7 +114,7 @@ export function Tooltip({
   return (
     <span
       ref={triggerRef}
-      className={`block min-w-0 max-w-full truncate ${className}`.trim()}
+      className={`inline-flex min-w-0 max-w-full ${className}`.trim()}
       aria-describedby={open ? tooltipId : undefined}
       onMouseEnter={tryOpen}
       onMouseLeave={() => commitOpen(false)}

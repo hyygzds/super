@@ -79,6 +79,47 @@ describe("Tooltip (Vue)", () => {
     wrapper.unmount();
   });
 
+  it("opens onlyIfOverflow when a nested truncated child overflows", async () => {
+    Object.defineProperty(HTMLElement.prototype, "scrollWidth", {
+      configurable: true,
+      get() {
+        return (this as HTMLElement).dataset.overflow === "true" ? 240 : 80;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+      configurable: true,
+      get() {
+        return 80;
+      },
+    });
+    const wrapper = mount(Tooltip, {
+      props: { content: "完整内容", onlyIfOverflow: true },
+      slots: {
+        default: () => <span data-overflow="true">很长的嵌套文本</span>,
+      },
+      attachTo: document.body,
+    });
+
+    await wrapper.trigger("mouseenter");
+    expect(document.body.querySelector('[role="tooltip"]')?.textContent).toBe(
+      "完整内容",
+    );
+
+    wrapper.unmount();
+  });
+
+  it("does not force block or truncate layout on the trigger", () => {
+    const wrapper = mount(Tooltip, {
+      props: { content: "提示" },
+      slots: {
+        default: () => <button type="button">按钮</button>,
+      },
+    });
+    expect(wrapper.classes()).not.toContain("truncate");
+    expect(wrapper.classes()).not.toContain("block");
+    wrapper.unmount();
+  });
+
   it("does not open when disabled", async () => {
     const wrapper = mount(Tooltip, {
       props: { content: "提示", disabled: true },

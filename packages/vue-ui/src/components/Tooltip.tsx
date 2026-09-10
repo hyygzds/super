@@ -20,9 +20,13 @@ export type TooltipProps = {
 };
 
 function isOverflowing(node: HTMLElement): boolean {
-  return (
-    node.scrollWidth - node.clientWidth > 1 ||
-    node.scrollHeight - node.clientHeight > 1
+  const nested = Array.from(node.querySelectorAll("*")).filter(
+    (el): el is HTMLElement => el instanceof HTMLElement,
+  );
+  return [node, ...nested].some(
+    (el) =>
+      el.scrollWidth - el.clientWidth > 1 ||
+      el.scrollHeight - el.clientHeight > 1,
   );
 }
 
@@ -117,7 +121,7 @@ export const Tooltip = defineComponent({
       return (
         <span
           ref={triggerRef}
-          class={`block min-w-0 max-w-full truncate ${props.class}`.trim()}
+          class={`inline-flex min-w-0 max-w-full ${props.class}`.trim()}
           aria-describedby={currentOpen.value ? tooltipId : undefined}
           onMouseenter={tryOpen}
           onMouseleave={() => commitOpen(false)}

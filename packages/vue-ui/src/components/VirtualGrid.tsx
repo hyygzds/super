@@ -1009,7 +1009,7 @@ export const VirtualGrid = defineComponent({
       const tooltip = overflowTooltipText(value);
       if (!shouldShowOverflowTooltip(column) || !tooltip) return text;
       return (
-        <Tooltip content={tooltip} onlyIfOverflow class="min-w-0 w-full">
+        <Tooltip content={tooltip} onlyIfOverflow class="block min-w-0 w-full truncate">
           {text}
         </Tooltip>
       );

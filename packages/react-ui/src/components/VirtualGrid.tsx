@@ -971,7 +971,7 @@ export function VirtualGrid({
     };
 
     const usedCustom = Boolean(column.render) || Boolean(renderCell);
-    const wrapOverflow = (node: ReactNode) => {
+    const wrapOverflow = (node: ReactNode, triggerClass: string) => {
       const text = overflowTooltipText(value);
       if (
         usedCustom ||
@@ -981,7 +981,7 @@ export function VirtualGrid({
         return node;
       }
       return (
-        <Tooltip content={text} onlyIfOverflow className="min-w-0 w-full">
+        <Tooltip content={text} onlyIfOverflow className={triggerClass}>
           {node}
         </Tooltip>
       );
@@ -1025,9 +1025,10 @@ export function VirtualGrid({
           <span className="min-w-0 truncate">{content}</span>
         </div>,
       ),
+        "min-w-0 w-full",
     );
     }
-    return wrapOverflow(wrapEditable(content));
+    return wrapOverflow(wrapEditable(content), "block min-w-0 w-full truncate");
   }
 
   function renderHeaderCell(column: VirtualGridColumn): ReactNode {
