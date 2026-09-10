@@ -99,3 +99,11 @@ export type SortState = {
 };
 
 export type SortCompare = (a: unknown, b: unknown) => number;
+
+export type FilterState = Record<string, string>;
+
+export type FilterPredicate = (
+  value: unknown,
+  query: string,
+  row: Record<string, unknown>,
+) => boolean;

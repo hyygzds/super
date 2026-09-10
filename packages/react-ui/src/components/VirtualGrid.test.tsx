@@ -688,6 +688,126 @@ describe("VirtualGrid (React) sort", () => {
   });
 });
 
+const filterColumns: VirtualGridColumn[] = [
+  { field: "id", title: "标识", width: 80 },
+  { field: "name", title: "名称", filterable: true },
+  { field: "city", title: "城市", filterable: true },
+];
+
+const filterRowsData = [
+  { id: "1", name: "Charlie", city: "Paris" },
+  { id: "2", name: "Alice", city: "London" },
+  { id: "3", name: "Bob", city: "Paris" },
+];
+
+function filterNameCells() {
+  return screen
+    .getAllByRole("row")
+    .slice(1)
+    .map((row) => within(row).getAllByRole("cell")[1].textContent);
+}
+
+describe("VirtualGrid (React) filter", () => {
+  it("filters rows as the header input changes and restores when cleared", async () => {
+    const user = userEvent.setup();
+    const onFiltersChange = vi.fn();
+    render(
+      <VirtualGrid
+        columns={filterColumns}
+        data={filterRowsData}
+        onFiltersChange={onFiltersChange}
+      />,
+    );
+
+    expect(filterNameCells()).toEqual(["Charlie", "Alice", "Bob"]);
+    const nameInput = screen.getByLabelText("筛选名称");
+    await user.type(nameInput, "a");
+    expect(onFiltersChange).toHaveBeenLastCalledWith({ name: "a" });
+    expect(filterNameCells()).toEqual(["Charlie", "Alice"]);
+
+    await user.clear(nameInput);
+    expect(onFiltersChange).toHaveBeenLastCalledWith({});
+    expect(filterNameCells()).toEqual(["Charlie", "Alice", "Bob"]);
+  });
+
+  it("ANDs multiple column filters", async () => {
+    const user = userEvent.setup();
+    render(<VirtualGrid columns={filterColumns} data={filterRowsData} />);
+
+    await user.type(screen.getByLabelText("筛选名称"), "a");
+    await user.type(screen.getByLabelText("筛选城市"), "paris");
+    expect(filterNameCells()).toEqual(["Charlie"]);
+  });
+
+  it("honors controlled filters and does not filter when the parent ignores onFiltersChange", async () => {
+    const user = userEvent.setup();
+    const onFiltersChange = vi.fn();
+    render(
+      <VirtualGrid
+        columns={filterColumns}
+        data={filterRowsData}
+        filters={{ name: "Alice" }}
+        onFiltersChange={onFiltersChange}
+      />,
+    );
+
+    expect(filterNameCells()).toEqual(["Alice"]);
+    await user.type(screen.getByLabelText("筛选名称"), "x");
+    expect(onFiltersChange).toHaveBeenCalled();
+    expect(filterNameCells()).toEqual(["Alice"]);
+  });
+
+  it("resets local pagination to page 1 when a filter changes", async () => {
+    const user = userEvent.setup();
+    const onPageChange = vi.fn();
+    render(
+      <VirtualGrid
+        columns={filterColumns}
+        data={[
+          { id: "1", name: "Zed", city: "A" },
+          { id: "2", name: "Yan", city: "B" },
+          { id: "3", name: "Abe", city: "C" },
+        ]}
+        pagination
+        pageSize={2}
+        onPageChange={onPageChange}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "下一页" }));
+    expect(screen.getByText("Abe")).toBeInTheDocument();
+    expect(screen.queryByText("Zed")).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("筛选名称"), "a");
+    expect(onPageChange).toHaveBeenLastCalledWith(1);
+    expect(screen.getByText("Abe")).toBeInTheDocument();
+    expect(screen.getByText("Yan")).toBeInTheDocument();
+    expect(screen.queryByText("Zed")).not.toBeInTheDocument();
+  });
+
+  it("does not filter local rows when remote is enabled", async () => {
+    const user = userEvent.setup();
+    const onFiltersChange = vi.fn();
+    render(
+      <VirtualGrid
+        columns={filterColumns}
+        data={filterRowsData}
+        remote
+        onFiltersChange={onFiltersChange}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("筛选名称"), "a");
+    expect(onFiltersChange).toHaveBeenLastCalledWith({ name: "a" });
+    expect(filterNameCells()).toEqual(["Charlie", "Alice", "Bob"]);
+  });
+
+  it("does not add a filter input on columns without filterable", () => {
+    render(<VirtualGrid columns={filterColumns} data={filterRowsData} />);
+    expect(screen.queryByLabelText("筛选标识")).not.toBeInTheDocument();
+  });
+});
+
 describe("VirtualGrid (React) overflow tooltip", () => {
   beforeEach(() => {
     Object.defineProperty(HTMLElement.prototype, "scrollWidth", {

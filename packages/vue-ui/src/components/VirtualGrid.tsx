@@ -5,6 +5,7 @@ import {
   clearKeys,
   computeVirtualWindow,
   flattenLeafColumns,
+  filterRows,
   flattenTree,
   isAllSelected,
   isIndeterminate,
@@ -12,11 +13,14 @@ import {
   nextSortState,
   normalizeSpans,
   selectAllKeys,
+  setFilterValue,
   slicePage,
   sortRows,
   toggleExpandKey,
   toggleKey,
   type DisplayRow,
+  type FilterPredicate,
+  type FilterState,
   type GridColumn,
   type GroupByConfig,
   type HeaderCell,
@@ -47,6 +51,8 @@ export type VirtualGridColumn = GridColumn & {
   editable?: boolean;
   sortable?: boolean;
   sorter?: SortCompare;
+  filterable?: boolean;
+  filter?: FilterPredicate;
   showOverflowTooltip?: boolean;
 };
 
@@ -75,7 +81,7 @@ export type VirtualGridExpandContext = {
   rowIndex: number;
 };
 
-export type { GroupByConfig, SortState, SpanMethod };
+export type { FilterState, GroupByConfig, SortState, SpanMethod };
 
 const ROW_NUMBER_WIDTH = 48;
 const SELECTION_WIDTH = 40;
@@ -453,6 +459,14 @@ export const VirtualGrid = defineComponent({
       type: Object as PropType<SortState | null>,
       default: null,
     },
+    filters: {
+      type: Object as PropType<FilterState | undefined>,
+      default: undefined,
+    },
+    defaultFilters: {
+      type: Object as PropType<FilterState>,
+      default: () => ({}),
+    },
   },
   emits: {
     "update:selectedKeys": (_keys: string[]) => true,
@@ -462,6 +476,7 @@ export const VirtualGrid = defineComponent({
     "update:expandedRowKeys": (_keys: string[]) => true,
     "update:editingRowKey": (_key: string | null) => true,
     "update:sort": (_sort: SortState | null) => true,
+    "update:filters": (_filters: FilterState) => true,
     cellChange: (_payload: VirtualGridCellChangePayload) => true,
     rowSave: (_row: Record<string, unknown>) => true,
     rowCancel: (_rowKey: string) => true,
@@ -485,6 +500,7 @@ export const VirtualGrid = defineComponent({
       props.defaultEditingRowKey,
     );
     const uncontrolledSort = ref<SortState | null>(props.defaultSort);
+    const uncontrolledFilters = ref<FilterState>({ ...props.defaultFilters });
     const childrenCache = ref(
       new Map<string, Record<string, unknown>[]>(),
     );
@@ -517,6 +533,7 @@ export const VirtualGrid = defineComponent({
     const sort = computed(() =>
       props.sort !== undefined ? props.sort : uncontrolledSort.value,
     );
+    const filters = computed(() => props.filters ?? uncontrolledFilters.value);
 
     function commitSelectedKeys(next: string[]) {
       if (props.selectedKeys === undefined) uncontrolledSelectedKeys.value = next;
@@ -545,6 +562,14 @@ export const VirtualGrid = defineComponent({
     function commitSort(next: SortState | null) {
       if (props.sort === undefined) uncontrolledSort.value = next;
       emit("update:sort", next);
+      if (props.pagination && !props.remote) {
+        setPage(1);
+      }
+    }
+
+    function commitFilters(next: FilterState) {
+      if (props.filters === undefined) uncontrolledFilters.value = next;
+      emit("update:filters", next);
       if (props.pagination && !props.remote) {
         setPage(1);
       }
@@ -594,10 +619,21 @@ export const VirtualGrid = defineComponent({
 
     const sortedSource = computed(() => {
       const source = props.tree ? treeData.value : props.data;
+      const predicates = Object.fromEntries(
+        (leafColumns.value as VirtualGridColumn[])
+          .filter((col) => col.filter)
+          .map((col) => [col.field, col.filter!]),
+      );
+      const filtered = props.remote
+        ? source
+        : filterRows(source, filters.value, {
+            predicates,
+            childrenField: props.tree ? props.childrenField : undefined,
+          });
       const current = sort.value;
-      if (props.remote || !current) return source;
+      if (props.remote || !current) return filtered;
       const column = leafColumns.value.find((col) => col.field === current.field);
-      return sortRows(source, current, {
+      return sortRows(filtered, current, {
         compare: (column as VirtualGridColumn | undefined)?.sorter,
         childrenField: props.tree ? props.childrenField : undefined,
       });
@@ -1101,6 +1137,16 @@ export const VirtualGrid = defineComponent({
       return !!column.sortable && !(column.children && column.children.length > 0);
     }
 
+    function isLeafFilterable(column: VirtualGridColumn): boolean {
+      return (
+        !!column.filterable && !(column.children && column.children.length > 0)
+      );
+    }
+
+    const hasFilterableLeaf = computed(() =>
+      (leafColumns.value as VirtualGridColumn[]).some(isLeafFilterable),
+    );
+
     function headerAriaSort(
       column: VirtualGridColumn | undefined,
     ): "none" | "ascending" | "descending" | undefined {
@@ -1113,14 +1159,7 @@ export const VirtualGrid = defineComponent({
 
     function renderHeaderCell(column: VirtualGridColumn) {
       const label = renderHeaderLabel(column);
-      if (!isLeafSortable(column)) return label;
-      const indicator =
-        sort.value?.field === column.field
-          ? sort.value.order === "asc"
-            ? "↑"
-            : "↓"
-          : "↕";
-      return (
+      const titleNode = isLeafSortable(column) ? (
         <button
           type="button"
           class="inline-flex min-w-0 items-center gap-1 text-left"
@@ -1128,9 +1167,33 @@ export const VirtualGrid = defineComponent({
         >
           <span class="truncate">{label}</span>
           <span aria-hidden class="shrink-0 text-xs text-slate-400">
-            {indicator}
+            {sort.value?.field === column.field
+              ? sort.value.order === "asc"
+                ? "↑"
+                : "↓"
+              : "↕"}
           </span>
         </button>
+      ) : (
+        label
+      );
+      if (!isLeafFilterable(column)) return titleNode;
+      return (
+        <div class="flex min-w-0 flex-col items-stretch gap-1">
+          {titleNode}
+          <label class="block min-w-0 font-normal">
+            <span class="sr-only">{`筛选${column.title}`}</span>
+            <Input
+              type="search"
+              clearable
+              modelValue={filters.value[column.field] ?? ""}
+              placeholder="筛选"
+              onUpdate:modelValue={(value: string) =>
+                commitFilters(setFilterValue(filters.value, column.field, value))
+              }
+            />
+          </label>
+        </div>
       );
     }
 
@@ -1584,7 +1647,11 @@ export const VirtualGrid = defineComponent({
               style={{
                 display: "grid",
                 gridTemplateColumns: gridTemplateColumns.value,
-                gridTemplateRows: `repeat(${depth}, ${headerRowH}px)`,
+                gridTemplateRows: `repeat(${depth}, ${
+                  hasFilterableLeaf.value
+                    ? `minmax(${headerRowH}px, auto)`
+                    : `${headerRowH}px`
+                })`,
                 position: "sticky",
                 top: 0,
                 zIndex: 5,
