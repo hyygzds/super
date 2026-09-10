@@ -43,6 +43,37 @@ export const Empty: Story = {
   args: { columns, data: [] },
 };
 
+export const OverflowTooltip: Story = {
+  args: {
+    columns: [
+      { field: "id", title: "标识", width: 72 },
+      { field: "name", title: "名称", width: 96 },
+      {
+        field: "note",
+        title: "备注",
+        width: 140,
+      },
+    ],
+    data: [
+      {
+        id: "1",
+        name: "超长名称会被截断显示",
+        note: "单元格内容较多时，悬停可查看完整备注：项目验收纪要、待办事项与补充说明。",
+      },
+      {
+        id: "2",
+        name: "短名",
+        note: "短备注",
+      },
+      {
+        id: "3",
+        name: "另一段很长的名称用于演示省略号",
+        note: "关闭 showOverflowTooltip 后将无法通过悬停阅读完整内容。",
+      },
+    ],
+  },
+};
+
 export const Virtual: Story = {
   args: {
     columns,

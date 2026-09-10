@@ -35,6 +35,7 @@ import { Button } from "./Button";
 import { Checkbox } from "./Checkbox";
 import { Input } from "./Input";
 import { Pagination } from "./Pagination";
+import { Tooltip } from "./Tooltip";
 
 export type VirtualGridCellContext = {
   row: Record<string, unknown>;
@@ -56,6 +57,7 @@ export type VirtualGridCellChangeInfo = {
 
 export type VirtualGridColumn = GridColumn & {
   editable?: boolean;
+  showOverflowTooltip?: boolean;
   render?: (ctx: VirtualGridCellContext) => ReactNode;
   renderHeader?: (ctx: VirtualGridHeaderContext) => ReactNode;
   children?: VirtualGridColumn[];
@@ -77,6 +79,7 @@ export type VirtualGridProps = {
   virtual?: boolean;
   overscan?: number;
   autoHeight?: boolean;
+  showOverflowTooltip?: boolean;
   bordered?: boolean;
   stripe?: boolean;
   showRowNumber?: boolean;
@@ -370,6 +373,22 @@ function setChildrenAtKey(
   });
 }
 
+function overflowTooltipText(value: unknown): string {
+  if (value == null) return "";
+  const text = String(value);
+  return text.trim().length === 0 ? "" : text;
+}
+
+function shouldShowOverflowTooltip(
+  column: VirtualGridColumn,
+  showOverflowTooltip: boolean,
+  autoHeight: boolean,
+): boolean {
+  if (column.showOverflowTooltip != null) return column.showOverflowTooltip;
+  if (autoHeight) return false;
+  return showOverflowTooltip;
+}
+
 function rowLabel(row: Record<string, unknown>, key: string): string {
   const name = row.name;
   return typeof name === "string" && name.length > 0 ? name : key;
@@ -393,6 +412,7 @@ export function VirtualGrid({
   virtual = false,
   overscan = 4,
   autoHeight = false,
+  showOverflowTooltip = true,
   bordered = true,
   stripe = false,
   showRowNumber = false,
@@ -950,12 +970,28 @@ export function VirtualGrid({
       );
     };
 
+    const wrapOverflow = (node: ReactNode) => {
+      const text = overflowTooltipText(value);
+      if (
+        !shouldShowOverflowTooltip(column, showOverflowTooltip, autoHeight) ||
+        !text
+      ) {
+        return node;
+      }
+      return (
+        <Tooltip content={text} className="min-w-0 w-full">
+          {node}
+        </Tooltip>
+      );
+    };
+
     if (tree && isFirstDataCol) {
       const depth = treeMeta?.depth ?? 0;
       const hasChildren = treeMeta?.hasChildren ?? false;
       const expanded = treeMeta?.expanded ?? false;
       const label = rowLabel(row, treeMeta?.key ?? key);
-      return wrapEditable(
+      return wrapOverflow(
+        wrapEditable(
         <div
           className="flex min-w-0 items-center gap-1"
           style={{ paddingLeft: depth * TREE_INDENT }}
@@ -986,9 +1022,10 @@ export function VirtualGrid({
           )}
           <span className="min-w-0 truncate">{content}</span>
         </div>,
-      );
+      ),
+    );
     }
-    return wrapEditable(content);
+    return wrapOverflow(wrapEditable(content));
   }
 
   function renderHeaderCell(column: VirtualGridColumn): ReactNode {
