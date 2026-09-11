@@ -10,8 +10,10 @@ import {
   isAllSelected,
   isIndeterminate,
   isTreeIndeterminate,
+  nextFrozenState,
   nextSortState,
   normalizeSpans,
+  resolveColumnFixed,
   selectAllKeys,
   setFilterValue,
   slicePage,
@@ -21,6 +23,7 @@ import {
   type DisplayRow,
   type FilterPredicate,
   type FilterState,
+  type FrozenState,
   type GridColumn,
   type GroupByConfig,
   type HeaderCell,
@@ -69,13 +72,14 @@ export type VirtualGridColumn = GridColumn & {
   sorter?: SortCompare;
   filterable?: boolean;
   filter?: FilterPredicate;
+  freezable?: boolean;
   showOverflowTooltip?: boolean;
   render?: (ctx: VirtualGridCellContext) => ReactNode;
   renderHeader?: (ctx: VirtualGridHeaderContext) => ReactNode;
   children?: VirtualGridColumn[];
 };
 
-export type { FilterState, GroupByConfig, SortState, SpanMethod };
+export type { FilterState, FrozenState, GroupByConfig, SortState, SpanMethod };
 
 export type VirtualGridExpandedRowContext = {
   row: Record<string, unknown>;
@@ -147,6 +151,9 @@ export type VirtualGridProps = {
   filters?: FilterState;
   defaultFilters?: FilterState;
   onFiltersChange?: (filters: FilterState) => void;
+  frozen?: FrozenState;
+  defaultFrozen?: FrozenState;
+  onFrozenChange?: (frozen: FrozenState) => void;
 };
 
 const ROW_NUMBER_WIDTH = 48;
@@ -490,6 +497,9 @@ export function VirtualGrid({
   filters: filtersProp,
   defaultFilters = {},
   onFiltersChange,
+  frozen: frozenProp,
+  defaultFrozen = {},
+  onFrozenChange,
 }: VirtualGridProps) {
   const [scrollTop, setScrollTop] = useState(0);
   const [headerHeight, setHeaderHeight] = useState(0);
@@ -521,6 +531,8 @@ export function VirtualGrid({
   );
   const [uncontrolledFilters, setUncontrolledFilters] =
     useState<FilterState>(defaultFilters);
+  const [uncontrolledFrozen, setUncontrolledFrozen] =
+    useState<FrozenState>(defaultFrozen);
   const [editingCell, setEditingCell] = useState<{
     rowKey: string;
     field: string;
@@ -536,6 +548,7 @@ export function VirtualGrid({
   const editingRowKey = editingRowKeyProp ?? uncontrolledEditingRowKey;
   const sort = sortProp !== undefined ? sortProp : uncontrolledSort;
   const filters = filtersProp ?? uncontrolledFilters;
+  const frozen = frozenProp ?? uncontrolledFrozen;
 
   const showExpandCol = expandable !== undefined && expandable !== false;
   const showRowActions = editMode === "row";
@@ -575,6 +588,11 @@ export function VirtualGrid({
     if (pagination && !remote) {
       setPage(1);
     }
+  }
+
+  function commitFrozen(next: FrozenState) {
+    if (frozenProp === undefined) setUncontrolledFrozen(next);
+    onFrozenChange?.(next);
   }
 
   function setPage(next: number) {
@@ -752,16 +770,25 @@ export function VirtualGrid({
     overscan,
   });
 
+  const layoutColumns = useMemo(
+    () =>
+      leafColumns.map((column) => ({
+        ...column,
+        fixed: resolveColumnFixed(column.field, column.fixed, frozen),
+      })),
+    [leafColumns, frozen],
+  );
+
   const layout = useMemo(
     () =>
       buildLayout(
-        leafColumns,
+        layoutColumns,
         selectable,
         showRowNumber,
         showExpandCol,
         showRowActions,
       ),
-    [leafColumns, selectable, showRowNumber, showExpandCol, showRowActions],
+    [layoutColumns, selectable, showRowNumber, showExpandCol, showRowActions],
   );
 
   const prefixCount =
@@ -1130,6 +1157,28 @@ export function VirtualGrid({
     return !!column.filterable && !(column.children && column.children.length > 0);
   }
 
+  function isLeafFreezable(column: VirtualGridColumn): boolean {
+    return !!column.freezable && !(column.children && column.children.length > 0);
+  }
+
+  function columnFixedSide(column: VirtualGridColumn) {
+    return resolveColumnFixed(column.field, column.fixed, frozen);
+  }
+
+  function freezeButtonLabel(column: VirtualGridColumn): string {
+    const side = columnFixedSide(column);
+    if (side === "left") return `右侧冻结${column.title}`;
+    if (side === "right") return `取消冻结${column.title}`;
+    return `左侧冻结${column.title}`;
+  }
+
+  function freezeGlyph(column: VirtualGridColumn): string {
+    const side = columnFixedSide(column);
+    if (side === "left") return "⇤";
+    if (side === "right") return "⇥";
+    return "⇔";
+  }
+
   const hasFilterableLeaf = leafColumns.some(isLeafFilterable);
 
   function headerAriaSort(
@@ -1144,7 +1193,7 @@ export function VirtualGrid({
 
   function renderHeaderCell(column: VirtualGridColumn): ReactNode {
     const label = renderHeaderLabel(column);
-    const titleNode = isLeafSortable(column) ? (
+    const sortOrLabel = isLeafSortable(column) ? (
       <button
         type="button"
         className="inline-flex min-w-0 items-center gap-1 text-left"
@@ -1162,6 +1211,32 @@ export function VirtualGrid({
     ) : (
       label
     );
+    const freezeBtn = isLeafFreezable(column) ? (
+      <button
+        type="button"
+        className="inline-flex shrink-0 items-center text-xs text-slate-400"
+        aria-label={freezeButtonLabel(column)}
+        aria-pressed={columnFixedSide(column) != null}
+        onClick={() =>
+          commitFrozen(nextFrozenState(frozen, column.field, column.fixed))
+        }
+      >
+        <span aria-hidden>{freezeGlyph(column)}</span>
+      </button>
+    ) : null;
+    const titleNode =
+      freezeBtn != null ? (
+        <span className="inline-flex min-w-0 items-center gap-1">
+          {isLeafSortable(column) ? (
+            sortOrLabel
+          ) : (
+            <span className="truncate">{label}</span>
+          )}
+          {freezeBtn}
+        </span>
+      ) : (
+        sortOrLabel
+      );
     if (!isLeafFilterable(column)) return titleNode;
     return (
       <div className="flex min-w-0 flex-col items-stretch gap-1">
@@ -1769,7 +1844,10 @@ export function VirtualGrid({
           renderSpannedBody()
         ) : canVirtualize ? (
           <div style={{ height: win.totalHeight, position: "relative" }}>
-            <div style={{ transform: `translateY(${win.offsetY}px)` }}>
+            <div
+              data-vg-virtual-body=""
+              style={{ paddingTop: `${win.offsetY}px` }}
+            >
               {bodyRows}
             </div>
           </div>

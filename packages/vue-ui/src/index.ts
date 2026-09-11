@@ -27,6 +27,7 @@ export type {
   VirtualGridHeaderContext,
   VirtualGridExpandContext,
   FilterState,
+  FrozenState,
   SortState,
 } from "./components/VirtualGrid";
 export { Transfer } from "./components/Transfer";

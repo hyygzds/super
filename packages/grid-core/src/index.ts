@@ -14,6 +14,8 @@ export type {
   SortCompare,
   FilterState,
   FilterPredicate,
+  FixedSide,
+  FrozenState,
 } from "./types";
 export { SelectionMode } from "./types";
 export { computeVirtualWindow } from "./virtual-window";
@@ -33,6 +35,11 @@ export {
   setFilterValue,
   filterRows,
 } from "./filter";
+export {
+  resolveColumnFixed,
+  nextFrozenState,
+  setColumnFrozen,
+} from "./freeze";
 export { buildGroupedRows } from "./group";
 export { normalizeSpans } from "./span";
 export type { TreeFlatRow, FlattenTreeInput, CascadeSelectInput } from "./tree";

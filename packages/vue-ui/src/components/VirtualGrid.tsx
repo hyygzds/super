@@ -10,8 +10,10 @@ import {
   isAllSelected,
   isIndeterminate,
   isTreeIndeterminate,
+  nextFrozenState,
   nextSortState,
   normalizeSpans,
+  resolveColumnFixed,
   selectAllKeys,
   setFilterValue,
   slicePage,
@@ -21,6 +23,7 @@ import {
   type DisplayRow,
   type FilterPredicate,
   type FilterState,
+  type FrozenState,
   type GridColumn,
   type GroupByConfig,
   type HeaderCell,
@@ -53,6 +56,7 @@ export type VirtualGridColumn = GridColumn & {
   sorter?: SortCompare;
   filterable?: boolean;
   filter?: FilterPredicate;
+  freezable?: boolean;
   showOverflowTooltip?: boolean;
 };
 
@@ -81,7 +85,7 @@ export type VirtualGridExpandContext = {
   rowIndex: number;
 };
 
-export type { FilterState, GroupByConfig, SortState, SpanMethod };
+export type { FilterState, FrozenState, GroupByConfig, SortState, SpanMethod };
 
 const ROW_NUMBER_WIDTH = 48;
 const SELECTION_WIDTH = 40;
@@ -467,6 +471,14 @@ export const VirtualGrid = defineComponent({
       type: Object as PropType<FilterState>,
       default: () => ({}),
     },
+    frozen: {
+      type: Object as PropType<FrozenState | undefined>,
+      default: undefined,
+    },
+    defaultFrozen: {
+      type: Object as PropType<FrozenState>,
+      default: () => ({}),
+    },
   },
   emits: {
     "update:selectedKeys": (_keys: string[]) => true,
@@ -477,6 +489,7 @@ export const VirtualGrid = defineComponent({
     "update:editingRowKey": (_key: string | null) => true,
     "update:sort": (_sort: SortState | null) => true,
     "update:filters": (_filters: FilterState) => true,
+    "update:frozen": (_frozen: FrozenState) => true,
     cellChange: (_payload: VirtualGridCellChangePayload) => true,
     rowSave: (_row: Record<string, unknown>) => true,
     rowCancel: (_rowKey: string) => true,
@@ -501,6 +514,7 @@ export const VirtualGrid = defineComponent({
     );
     const uncontrolledSort = ref<SortState | null>(props.defaultSort);
     const uncontrolledFilters = ref<FilterState>({ ...props.defaultFilters });
+    const uncontrolledFrozen = ref<FrozenState>({ ...props.defaultFrozen });
     const childrenCache = ref(
       new Map<string, Record<string, unknown>[]>(),
     );
@@ -534,6 +548,7 @@ export const VirtualGrid = defineComponent({
       props.sort !== undefined ? props.sort : uncontrolledSort.value,
     );
     const filters = computed(() => props.filters ?? uncontrolledFilters.value);
+    const frozen = computed(() => props.frozen ?? uncontrolledFrozen.value);
 
     function commitSelectedKeys(next: string[]) {
       if (props.selectedKeys === undefined) uncontrolledSelectedKeys.value = next;
@@ -573,6 +588,11 @@ export const VirtualGrid = defineComponent({
       if (props.pagination && !props.remote) {
         setPage(1);
       }
+    }
+
+    function commitFrozen(next: FrozenState) {
+      if (props.frozen === undefined) uncontrolledFrozen.value = next;
+      emit("update:frozen", next);
     }
 
     function setPage(next: number) {
@@ -748,8 +768,15 @@ export const VirtualGrid = defineComponent({
       }),
     );
 
+    const layoutColumns = computed(() =>
+      (leafColumns.value as VirtualGridColumn[]).map((column) => ({
+        ...column,
+        fixed: resolveColumnFixed(column.field, column.fixed, frozen.value),
+      })),
+    );
+
     const layout = computed(() =>
-      buildLayout(leafColumns.value, props.selectable, props.showRowNumber),
+      buildLayout(layoutColumns.value, props.selectable, props.showRowNumber),
     );
 
     const prefixCount = computed(
@@ -1143,6 +1170,30 @@ export const VirtualGrid = defineComponent({
       );
     }
 
+    function isLeafFreezable(column: VirtualGridColumn): boolean {
+      return (
+        !!column.freezable && !(column.children && column.children.length > 0)
+      );
+    }
+
+    function columnFixedSide(column: VirtualGridColumn) {
+      return resolveColumnFixed(column.field, column.fixed, frozen.value);
+    }
+
+    function freezeButtonLabel(column: VirtualGridColumn): string {
+      const side = columnFixedSide(column);
+      if (side === "left") return `右侧冻结${column.title}`;
+      if (side === "right") return `取消冻结${column.title}`;
+      return `左侧冻结${column.title}`;
+    }
+
+    function freezeGlyph(column: VirtualGridColumn): string {
+      const side = columnFixedSide(column);
+      if (side === "left") return "⇤";
+      if (side === "right") return "⇥";
+      return "⇔";
+    }
+
     const hasFilterableLeaf = computed(() =>
       (leafColumns.value as VirtualGridColumn[]).some(isLeafFilterable),
     );
@@ -1159,7 +1210,7 @@ export const VirtualGrid = defineComponent({
 
     function renderHeaderCell(column: VirtualGridColumn) {
       const label = renderHeaderLabel(column);
-      const titleNode = isLeafSortable(column) ? (
+      const sortOrLabel = isLeafSortable(column) ? (
         <button
           type="button"
           class="inline-flex min-w-0 items-center gap-1 text-left"
@@ -1177,6 +1228,34 @@ export const VirtualGrid = defineComponent({
       ) : (
         label
       );
+      const freezeBtn = isLeafFreezable(column) ? (
+        <button
+          type="button"
+          class="inline-flex shrink-0 items-center text-xs text-slate-400"
+          aria-label={freezeButtonLabel(column)}
+          aria-pressed={columnFixedSide(column) != null}
+          onClick={() =>
+            commitFrozen(
+              nextFrozenState(frozen.value, column.field, column.fixed),
+            )
+          }
+        >
+          <span aria-hidden>{freezeGlyph(column)}</span>
+        </button>
+      ) : null;
+      const titleNode =
+        freezeBtn != null ? (
+          <span class="inline-flex min-w-0 items-center gap-1">
+            {isLeafSortable(column) ? (
+              sortOrLabel
+            ) : (
+              <span class="truncate">{label}</span>
+            )}
+            {freezeBtn}
+          </span>
+        ) : (
+          sortOrLabel
+        );
       if (!isLeafFilterable(column)) return titleNode;
       return (
         <div class="flex min-w-0 flex-col items-stretch gap-1">
@@ -1756,7 +1835,10 @@ export const VirtualGrid = defineComponent({
                   position: "relative",
                 }}
               >
-                <div style={{ transform: `translateY(${win.value.offsetY}px)` }}>
+                <div
+                  data-vg-virtual-body=""
+                  style={{ paddingTop: `${win.value.offsetY}px` }}
+                >
                   {bodyRows}
                 </div>
               </div>

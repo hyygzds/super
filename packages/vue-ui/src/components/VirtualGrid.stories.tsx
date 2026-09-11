@@ -164,6 +164,35 @@ export const Filter: Story = {
   ),
 };
 
+export const Freeze: Story = {
+  render: () => (
+    <VirtualGrid
+      columns={[
+        { field: "id", title: "ID", width: 72, freezable: true },
+        { field: "code", title: "编号", width: 100, freezable: true },
+        { field: "name", title: "名称", width: 180, freezable: true },
+        { field: "fullName", title: "全称", width: 220 },
+        { field: "extra1", title: "扩展一", width: 160 },
+        { field: "extra2", title: "扩展二", width: 160 },
+        { field: "extra3", title: "扩展三", width: 160 },
+        { field: "status", title: "状态", width: 90, freezable: true },
+      ]}
+      data={Array.from({ length: 40 }, (_, i) => ({
+        id: String(i + 1),
+        code: String(i + 1).padStart(4, "0"),
+        name: `Name ${i + 1}`,
+        fullName: `Full Name ${i + 1}`,
+        extra1: `E1-${i + 1}`,
+        extra2: `E2-${i + 1}`,
+        extra3: `E3-${i + 1}`,
+        status: i % 2 === 0 ? "启用" : "停用",
+      }))}
+      height={320}
+      virtual
+    />
+  ),
+};
+
 export const SelectionWithPagination: Story = {
   render: () => (
     <VirtualGrid

@@ -1,10 +1,12 @@
+export type FixedSide = "left" | "right";
+
 export type GridColumn = {
   field: string;
   title: string;
   width?: number;
   hidden?: boolean;
   /** Sticky column on horizontal scroll. */
-  fixed?: "left" | "right";
+  fixed?: FixedSide;
   children?: GridColumn[];
 };
 
@@ -101,6 +103,9 @@ export type SortState = {
 export type SortCompare = (a: unknown, b: unknown) => number;
 
 export type FilterState = Record<string, string>;
+
+/** Missing key inherits `columns[].fixed`; explicit `null` clears it. */
+export type FrozenState = Record<string, FixedSide | null>;
 
 export type FilterPredicate = (
   value: unknown,

@@ -772,6 +772,98 @@ describe("VirtualGrid (Vue) filter", () => {
   });
 });
 
+const freezeColumns: VirtualGridColumn[] = [
+  { field: "id", title: "标识", width: 80 },
+  { field: "name", title: "名称", width: 160, freezable: true },
+  { field: "note", title: "备注", width: 240 },
+];
+
+function freezeHeader(wrapper: ReturnType<typeof mount>) {
+  return wrapper
+    .findAll('[role="columnheader"]')
+    .find((h) => h.text().includes("名称"))!;
+}
+
+describe("VirtualGrid (Vue) freeze", () => {
+  it("cycles a freezable header none → left → right → none and updates sticky", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: { columns: freezeColumns, data: makeRows(2) },
+    });
+
+    const headerEl = () => freezeHeader(wrapper).element as HTMLElement;
+    expect(headerEl().style.position).not.toBe("sticky");
+
+    await wrapper.find('button[aria-label="左侧冻结名称"]').trigger("click");
+    expect(wrapper.emitted("update:frozen")?.at(-1)).toEqual([{ name: "left" }]);
+    expect(headerEl().style.position).toBe("sticky");
+    expect(headerEl().style.left).toBe("0px");
+
+    await wrapper.find('button[aria-label="右侧冻结名称"]').trigger("click");
+    expect(wrapper.emitted("update:frozen")?.at(-1)).toEqual([{ name: "right" }]);
+    expect(headerEl().style.position).toBe("sticky");
+    expect(headerEl().style.right).toBe("0px");
+
+    await wrapper.find('button[aria-label="取消冻结名称"]').trigger("click");
+    expect(wrapper.emitted("update:frozen")?.at(-1)).toEqual([{ name: null }]);
+    expect(headerEl().style.position).not.toBe("sticky");
+  });
+
+  it("honors controlled frozen and does not update sticky when the parent ignores update:frozen", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: freezeColumns,
+        data: makeRows(2),
+        frozen: { name: "left" },
+      },
+    });
+
+    const headerEl = freezeHeader(wrapper).element as HTMLElement;
+    expect(headerEl.style.position).toBe("sticky");
+    expect(headerEl.style.left).toBe("0px");
+
+    await wrapper.find('button[aria-label="右侧冻结名称"]').trigger("click");
+    expect(wrapper.emitted("update:frozen")?.[0]).toEqual([{ name: "right" }]);
+    expect(headerEl.style.position).toBe("sticky");
+    expect(headerEl.style.left).toBe("0px");
+  });
+
+  it("does not add a freeze button on columns without freezable", () => {
+    const wrapper = mount(VirtualGrid, {
+      props: { columns: freezeColumns, data: makeRows(2) },
+    });
+    expect(wrapper.find('button[aria-label="左侧冻结标识"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("offsets the virtual body with padding-top instead of transform", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: {
+        columns: [
+          { field: "id", title: "标识", width: 80, fixed: "left" },
+          { field: "name", title: "名称", width: 200 },
+        ],
+        data: makeRows(200),
+        virtual: true,
+        height: 100,
+        rowHeight: 20,
+        overscan: 1,
+      },
+    });
+
+    const scroller = wrapper.find('[role="rowgroup"]');
+    (scroller.element as HTMLElement).scrollTop = 20 * 149 + 80;
+    await scroller.trigger("scroll");
+
+    expect(wrapper.text()).toMatch(/Row 15\d/);
+    const body = wrapper.find("[data-vg-virtual-body]")
+      .element as HTMLElement;
+    expect(body).toBeTruthy();
+    expect(body.style.transform).toBe("");
+    expect(Number.parseFloat(body.style.paddingTop)).toBeGreaterThan(0);
+  });
+});
+
 describe("VirtualGrid (Vue) overflow tooltip", () => {
   beforeEach(() => {
     Object.defineProperty(HTMLElement.prototype, "scrollWidth", {
