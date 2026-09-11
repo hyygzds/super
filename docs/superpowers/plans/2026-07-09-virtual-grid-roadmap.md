@@ -54,6 +54,7 @@
 10. VirtualGrid P0–P5 已齐；剩余 Storybook 目视确认
 11. 列排序（issue #6）：[`2026-09-10-virtual-grid-sort.md`](./2026-09-10-virtual-grid-sort.md)
 12. 列筛选（issue #10）：[`2026-09-10-virtual-grid-filter.md`](./2026-09-10-virtual-grid-filter.md)
+13. 列冻结（issue #12）：[`2026-09-11-virtual-grid-freeze.md`](./2026-09-11-virtual-grid-freeze.md)
 
 ---
 

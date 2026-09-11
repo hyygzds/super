@@ -808,6 +808,94 @@ describe("VirtualGrid (React) filter", () => {
   });
 });
 
+const freezeColumns: VirtualGridColumn[] = [
+  { field: "id", title: "标识", width: 80 },
+  { field: "name", title: "名称", width: 160, freezable: true },
+  { field: "note", title: "备注", width: 240 },
+];
+
+describe("VirtualGrid (React) freeze", () => {
+  it("cycles a freezable header none → left → right → none and updates sticky", async () => {
+    const user = userEvent.setup();
+    const onFrozenChange = vi.fn();
+    render(
+      <VirtualGrid
+        columns={freezeColumns}
+        data={makeRows(2)}
+        onFrozenChange={onFrozenChange}
+      />,
+    );
+
+    const nameHeader = screen.getByRole("columnheader", { name: /名称/ });
+    expect(nameHeader).not.toHaveStyle({ position: "sticky" });
+
+    await user.click(screen.getByRole("button", { name: "左侧冻结名称" }));
+    expect(onFrozenChange).toHaveBeenLastCalledWith({ name: "left" });
+    expect(nameHeader).toHaveStyle({ position: "sticky", left: "0px" });
+
+    await user.click(screen.getByRole("button", { name: "右侧冻结名称" }));
+    expect(onFrozenChange).toHaveBeenLastCalledWith({ name: "right" });
+    expect(nameHeader).toHaveStyle({ position: "sticky", right: "0px" });
+
+    await user.click(screen.getByRole("button", { name: "取消冻结名称" }));
+    expect(onFrozenChange).toHaveBeenLastCalledWith({ name: null });
+    expect(nameHeader).not.toHaveStyle({ position: "sticky" });
+  });
+
+  it("honors controlled frozen and does not update sticky when the parent ignores onFrozenChange", async () => {
+    const user = userEvent.setup();
+    const onFrozenChange = vi.fn();
+    render(
+      <VirtualGrid
+        columns={freezeColumns}
+        data={makeRows(2)}
+        frozen={{ name: "left" }}
+        onFrozenChange={onFrozenChange}
+      />,
+    );
+
+    const nameHeader = screen.getByRole("columnheader", { name: /名称/ });
+    expect(nameHeader).toHaveStyle({ position: "sticky", left: "0px" });
+
+    await user.click(screen.getByRole("button", { name: "右侧冻结名称" }));
+    expect(onFrozenChange).toHaveBeenCalled();
+    expect(nameHeader).toHaveStyle({ position: "sticky", left: "0px" });
+  });
+
+  it("does not add a freeze button on columns without freezable", () => {
+    render(<VirtualGrid columns={freezeColumns} data={makeRows(2)} />);
+    expect(
+      screen.queryByRole("button", { name: "左侧冻结标识" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("offsets the virtual body with padding-top instead of transform", () => {
+    render(
+      <VirtualGrid
+        columns={[
+          { field: "id", title: "标识", width: 80, fixed: "left" },
+          { field: "name", title: "名称", width: 200 },
+        ]}
+        data={makeRows(80)}
+        virtual
+        height={160}
+        rowHeight={20}
+        overscan={1}
+      />,
+    );
+
+    const scroller = screen.getByRole("rowgroup");
+    fireEvent.scroll(scroller, { target: { scrollTop: 20 * 20 + 40 } });
+
+    const body = document.querySelector("[data-vg-virtual-body]");
+    expect(body).toBeTruthy();
+    expect((body as HTMLElement).style.transform).toBe("");
+    expect(Number.parseFloat((body as HTMLElement).style.paddingTop)).toBeGreaterThan(
+      0,
+    );
+  });
+});
+
 describe("VirtualGrid (React) overflow tooltip", () => {
   beforeEach(() => {
     Object.defineProperty(HTMLElement.prototype, "scrollWidth", {
