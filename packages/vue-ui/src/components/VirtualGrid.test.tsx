@@ -770,6 +770,39 @@ describe("VirtualGrid (Vue) filter", () => {
     });
     expect(filterHeader(wrapper, "标识").find("input").exists()).toBe(false);
   });
+
+  it("reveals matching tree descendants even when parents start collapsed", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: { columns: filterColumns, data: treeData, tree: true },
+    });
+
+    expect(wrapper.text()).toContain("Parent");
+    expect(wrapper.text()).not.toContain("Child A");
+
+    await filterInput(wrapper, "名称").setValue("Child A");
+    expect(wrapper.text()).toContain("Parent");
+    expect(wrapper.text()).toContain("Child A");
+    expect(wrapper.text()).not.toContain("Child B");
+    expect(wrapper.text()).not.toContain("Leaf");
+    expect(wrapper.emitted("update:expandedKeys")).toBeUndefined();
+  });
+
+  it("does not persist expand state when collapsing during a local filter", async () => {
+    const wrapper = mount(VirtualGrid, {
+      props: { columns: filterColumns, data: treeData, tree: true },
+    });
+
+    await filterInput(wrapper, "名称").setValue("Child A");
+    expect(wrapper.text()).toContain("Child A");
+
+    await wrapper.find('button[aria-label="折叠 Parent"]').trigger("click");
+    expect(wrapper.text()).toContain("Child A");
+    expect(wrapper.emitted("update:expandedKeys")).toBeUndefined();
+
+    await filterInput(wrapper, "名称").setValue("");
+    expect(wrapper.text()).not.toContain("Child A");
+    expect(wrapper.find('button[aria-label="展开 Parent"]').exists()).toBe(true);
+  });
 });
 
 const freezeColumns: VirtualGridColumn[] = [

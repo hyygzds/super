@@ -806,6 +806,53 @@ describe("VirtualGrid (React) filter", () => {
     render(<VirtualGrid columns={filterColumns} data={filterRowsData} />);
     expect(screen.queryByLabelText("筛选标识")).not.toBeInTheDocument();
   });
+
+  it("reveals matching tree descendants even when parents start collapsed", async () => {
+    const user = userEvent.setup();
+    const onExpandedKeysChange = vi.fn();
+    render(
+      <VirtualGrid
+        columns={filterColumns}
+        data={treeData}
+        tree
+        onExpandedKeysChange={onExpandedKeysChange}
+      />,
+    );
+
+    expect(screen.getByText("Parent")).toBeInTheDocument();
+    expect(screen.queryByText("Child A")).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("筛选名称"), "Child A");
+    expect(screen.getByText("Parent")).toBeInTheDocument();
+    expect(screen.getByText("Child A")).toBeInTheDocument();
+    expect(screen.queryByText("Child B")).not.toBeInTheDocument();
+    expect(screen.queryByText("Leaf")).not.toBeInTheDocument();
+    expect(onExpandedKeysChange).not.toHaveBeenCalled();
+  });
+
+  it("does not persist expand state when collapsing during a local filter", async () => {
+    const user = userEvent.setup();
+    const onExpandedKeysChange = vi.fn();
+    render(
+      <VirtualGrid
+        columns={filterColumns}
+        data={treeData}
+        tree
+        onExpandedKeysChange={onExpandedKeysChange}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("筛选名称"), "Child A");
+    expect(screen.getByText("Child A")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "折叠 Parent" }));
+    expect(screen.getByText("Child A")).toBeInTheDocument();
+    expect(onExpandedKeysChange).not.toHaveBeenCalled();
+
+    await user.clear(screen.getByLabelText("筛选名称"));
+    expect(screen.queryByText("Child A")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "展开 Parent" })).toBeInTheDocument();
+  });
 });
 
 const freezeColumns: VirtualGridColumn[] = [

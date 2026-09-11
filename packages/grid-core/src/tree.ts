@@ -83,6 +83,33 @@ export function toggleExpandKey(
   return [...set];
 }
 
+/** Keys of nodes that have children (needed to reveal a filtered subtree). */
+export function collectExpandableKeys(
+  rows: readonly Record<string, unknown>[],
+  options?: { idField?: string; childrenField?: string },
+): string[] {
+  const idField = options?.idField ?? "id";
+  const childrenField = options?.childrenField ?? "children";
+  const keys: string[] = [];
+
+  function walk(
+    nodes: readonly Record<string, unknown>[],
+    path: string,
+  ) {
+    nodes.forEach((row, index) => {
+      const key = nodeKey(row, idField, `${path}/${index}`);
+      const kids = childrenOf(row, childrenField);
+      if (kids.length > 0 || row.__hasChildren === true) {
+        keys.push(key);
+      }
+      if (kids.length > 0) walk(kids, `${path}/${index}`);
+    });
+  }
+
+  walk(rows, "r");
+  return keys;
+}
+
 /** Collect keys of node and all descendants in the tree (regardless of expand). */
 export function collectDescendantKeys(
   row: Record<string, unknown>,

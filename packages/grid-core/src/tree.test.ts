@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   cascadeToggleKey,
   collectDescendantKeys,
+  collectExpandableKeys,
   flattenTree,
   isTreeIndeterminate,
   toggleExpandKey,
@@ -57,6 +58,12 @@ describe("flattenTree", () => {
       data: [{ id: "L", name: "Lazy", __hasChildren: true }],
     });
     expect(rows[0]?.hasChildren).toBe(true);
+  });
+});
+
+describe("collectExpandableKeys", () => {
+  it("returns keys of nodes that still have children", () => {
+    expect(collectExpandableKeys(tree)).toEqual(["1", "1-2"]);
   });
 });
 
