@@ -878,6 +878,7 @@ export const VirtualGrid = defineComponent({
     }
 
     async function onToggleTreeExpand(meta: TreeMeta, row: Record<string, unknown>) {
+      if (!props.remote && activeFilterEntries(filters.value).length > 0) return;
       const next = toggleExpandKey(expandedKeys.value, meta.key);
       const willExpand = !meta.expanded;
       commitExpandedKeys(next);

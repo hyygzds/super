@@ -889,6 +889,7 @@ export function VirtualGrid({
   }
 
   async function handleTreeExpand(flat: TreeFlatRow) {
+    if (!remote && activeFilterEntries(filters).length > 0) return;
     const nextKeys = toggleExpandKey(expandedKeys, flat.key);
     const willExpand = !flat.expanded;
     commitExpandedKeys(nextKeys);
