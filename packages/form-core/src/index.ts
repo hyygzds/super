@@ -10,3 +10,11 @@ export {
   getValueAtPath,
   setValueAtPath,
 } from "./name-path";
+export type { CalendarCell, CalendarGrid } from "./date";
+export {
+  parseIsoDate,
+  formatIsoDate,
+  addMonths,
+  isDateInRange,
+  buildMonthGrid,
+} from "./date";
