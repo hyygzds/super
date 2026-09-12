@@ -16,6 +16,7 @@ export type { RadioOption, RadioOrientation } from "./components/Radio";
 export { Switch } from "./components/Switch";
 export { Input } from "./components/Input";
 export type { InputType } from "./components/Input";
+export { DatePicker } from "./components/DatePicker";
 export { InputNumber } from "./components/InputNumber";
 export { Textarea } from "./components/Textarea";
 export { VirtualGrid } from "./components/VirtualGrid";
