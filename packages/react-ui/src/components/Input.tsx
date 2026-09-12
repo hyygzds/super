@@ -15,6 +15,7 @@ export type InputProps = {
   clearable?: boolean;
   maxLength?: number;
   disabled?: boolean;
+  readOnly?: boolean;
   id?: string;
   className?: string;
 };
@@ -32,6 +33,7 @@ export function Input({
   clearable = false,
   maxLength,
   disabled = false,
+  readOnly = false,
   id,
   className = "",
 }: InputProps) {
@@ -78,6 +80,7 @@ export function Input({
         placeholder={placeholder}
         maxLength={maxLength}
         disabled={disabled}
+        readOnly={readOnly}
         className={`${inputCls}${showClear ? " pr-7" : ""}`}
         onChange={handleChange}
         onBlur={onBlur}

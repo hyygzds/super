@@ -18,6 +18,7 @@ export const Input = defineComponent({
     clearable: { type: Boolean, default: false },
     maxLength: { type: Number, default: undefined },
     disabled: { type: Boolean, default: false },
+    readOnly: { type: Boolean, default: false },
     id: { type: String, default: undefined },
     class: { type: String, default: "" },
   },
@@ -45,7 +46,10 @@ export const Input = defineComponent({
     }
 
     function handleInput(e: Event) {
-      if (props.disabled) return;
+      if (props.disabled || props.readOnly) {
+        if (inputRef.value) inputRef.value.value = currentValue();
+        return;
+      }
       commit((e.target as HTMLInputElement).value);
     }
 
@@ -69,6 +73,7 @@ export const Input = defineComponent({
             placeholder={props.placeholder}
             maxlength={props.maxLength}
             disabled={props.disabled}
+            readonly={props.readOnly || undefined}
             class={[inputCls, showClear ? "pr-8" : ""].join(" ")}
             onInput={handleInput}
             onBlur={(e: FocusEvent) => emit("blur", e)}

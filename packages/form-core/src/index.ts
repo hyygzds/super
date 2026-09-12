@@ -10,3 +10,13 @@ export {
   getValueAtPath,
   setValueAtPath,
 } from "./name-path";
+export type { CalendarCell, IsoDateParts } from "./date";
+export {
+  buildMonthGrid,
+  compareIsoDate,
+  formatIsoDate,
+  isIsoDateInRange,
+  parseIsoDate,
+  shiftMonth,
+  todayIsoDate,
+} from "./date";
