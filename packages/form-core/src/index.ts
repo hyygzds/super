@@ -10,3 +10,16 @@ export {
   getValueAtPath,
   setValueAtPath,
 } from "./name-path";
+export type { CalendarCell, CalendarYmd } from "./date-calendar";
+export {
+  addMonths,
+  buildMonthGrid,
+  compareIsoDate,
+  daysInMonth,
+  formatIsoDate,
+  isIsoDateInRange,
+  isValidIsoDate,
+  parseIsoDate,
+  todayIso,
+  visibleMonthFromValue,
+} from "./date-calendar";

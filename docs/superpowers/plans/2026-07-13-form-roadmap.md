@@ -43,6 +43,8 @@
 
 1. Storybook 目视确认 Form P0–P3（需人工）
 
+**独立后续（DatePicker）已完成**：规格 [`2026-09-12-datepicker-design.md`](../specs/2026-09-12-datepicker-design.md)，计划 [`2026-09-12-datepicker.md`](./2026-09-12-datepicker.md)。`form-core` 日历纯函数 + 双端 `DatePicker`（issue #15）。
+
 ---
 
 ## 与 VirtualGrid roadmap 的交叉

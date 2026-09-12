@@ -45,6 +45,7 @@ npm workspaces：`packages/*` + `apps/*`。核心包与 UI 包独立发布/构�
 | `Radio` / `RadioGroup` | ✅ | ✅ | |
 | `Switch` | ✅ | ✅ | |
 | `Input` / `InputNumber` / `Textarea` | ✅ | ✅ | |
+| `DatePicker` | ✅ | ✅ | 单日 `YYYY-MM-DD`；规格 [`2026-09-12-datepicker-design.md`](docs/superpowers/specs/2026-09-12-datepicker-design.md) |
 | `Form` / `FormItem` / `Form.List` | ✅ | ✅ | P0–P3：嵌套路径、`Form.List`、`validateTrigger` |
 | `Transfer` | ✅ | ✅ | 穿梭框；规格 [`2026-09-09-transfer-design.md`](docs/superpowers/specs/2026-09-09-transfer-design.md) |
 | `VirtualGrid` | ✅（P0–P5） | ✅（P0–P5） | 基础表、虚拟滚动、选中、分页、模板/行高/固定列、分组/合并、树/展开、编辑/远端分页 |
