@@ -58,6 +58,17 @@ describe("Input (React)", () => {
     expect(input).toHaveAttribute("type", "password");
   });
 
+  it("does not change value when readOnly", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Input defaultValue="2026-09-12" readOnly onChange={onChange} />);
+    const input = screen.getByDisplayValue("2026-09-12");
+    expect(input).toHaveAttribute("readonly");
+    await user.type(input, "x");
+    expect(onChange).not.toHaveBeenCalled();
+    expect(input).toHaveValue("2026-09-12");
+  });
+
   it("calls onBlur", async () => {
     const user = userEvent.setup();
     const onBlur = vi.fn();

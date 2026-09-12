@@ -22,6 +22,7 @@
 | 2 | [`2026-08-07-input-controls.md`](./2026-08-07-input-controls.md) | 双端 `Input` / `InputNumber` / `Textarea`（P1） | 建议在 Form 接线 Story 前；可与 1 部分并行，但完整 Form demo 依赖本项 |
 | 3 | [`2026-08-07-choice-controls.md`](./2026-08-07-choice-controls.md) | 双端 `Radio`/`RadioGroup` / `Switch` + Checkbox/Select 接入 Story（P2） | 依赖 1；控件本身可不依赖 Form，接入 Story 依赖 1 |
 | 4 | [`2026-08-14-form-p3-nested-list.md`](./2026-08-14-form-p3-nested-list.md) | 嵌套 NamePath、`Form.List`、`validateTrigger`、dependencies 重校验（P3） | 依赖 1 |
+| 5 | [`2026-09-12-datepicker.md`](./2026-09-12-datepicker.md) | 双端 `DatePicker` + `form-core` 月历（issue #15） | 依赖 2（`Input`）；`Button` 已有 |
 
 **规则（来自 spec §5）：** 原子控件必须先作为完整库组件合入；Form 只消费公开 API。P0 可用原生 input 验证接线，P1 起 Story 改用库组件。
 
@@ -39,9 +40,10 @@
 **P0 已完成**（[`2026-07-13-form-core-and-form.md`](./2026-07-13-form-core-and-form.md)）：`form-core` + 双端 Form/FormItem。  
 **P1 已完成**（[`2026-08-07-input-controls.md`](./2026-08-07-input-controls.md)）：双端 `Input` / `InputNumber` / `Textarea`。  
 **P2 已完成**（[`2026-08-07-choice-controls.md`](./2026-08-07-choice-controls.md)）：`Radio`/`RadioGroup` / `Switch`；FormItem `valuePropName` 接入 Checkbox/Switch；Select 接入 Story。  
-**P3 已完成**（规格 [`2026-08-14-form-p3-nested-list-design.md`](../specs/2026-08-14-form-p3-nested-list-design.md)，计划 [`2026-08-14-form-p3-nested-list.md`](./2026-08-14-form-p3-nested-list.md)）：嵌套路径、Form.List、validateTrigger、dependencies。
+**P3 已完成**（规格 [`2026-08-14-form-p3-nested-list-design.md`](../specs/2026-08-14-form-p3-nested-list-design.md)，计划 [`2026-08-14-form-p3-nested-list.md`](./2026-08-14-form-p3-nested-list.md)）：嵌套路径、Form.List、validateTrigger、dependencies。  
+**DatePicker 已完成**（规格 [`2026-09-12-datepicker-design.md`](../specs/2026-09-12-datepicker-design.md)，计划 [`2026-09-12-datepicker.md`](./2026-09-12-datepicker.md)）：`form-core` 月历 + 双端单日选择。
 
-1. Storybook 目视确认 Form P0–P3（需人工）
+1. Storybook 目视确认 Form P0–P3 与 DatePicker（需人工）
 
 ---
 

@@ -55,6 +55,17 @@ describe("Input (Vue)", () => {
     expect(wrapper.find("input").attributes("type")).toBe("password");
   });
 
+  it("does not change value when readOnly", async () => {
+    const wrapper = mount(Input, {
+      props: { defaultModelValue: "2026-09-12", readOnly: true },
+    });
+    const input = wrapper.find("input");
+    expect(input.attributes("readonly")).toBeDefined();
+    await input.setValue("typed");
+    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+    expect((input.element as HTMLInputElement).value).toBe("2026-09-12");
+  });
+
   it("disables interaction when disabled", async () => {
     const wrapper = mount(Input, {
       props: { disabled: true, defaultModelValue: "x", clearable: true },
