@@ -40,6 +40,18 @@ describe("Input (Vue)", () => {
     expect((wrapper.find("input").element as HTMLInputElement).value).toBe("");
   });
 
+  it("does not change value when readOnly", async () => {
+    const wrapper = mount(Input, {
+      props: { defaultModelValue: "keep", readOnly: true },
+    });
+    const input = wrapper.find("input");
+    expect(input.attributes("readonly")).toBeDefined();
+
+    await input.setValue("typed");
+    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+    expect((input.element as HTMLInputElement).value).toBe("keep");
+  });
+
   it("emits blur", async () => {
     const wrapper = mount(Input, {
       props: { defaultModelValue: "" },

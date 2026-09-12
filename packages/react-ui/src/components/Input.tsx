@@ -2,6 +2,7 @@ import {
   useState,
   type ChangeEvent,
   type FocusEvent,
+  type MouseEvent,
   type ReactNode,
 } from "react";
 
@@ -10,13 +11,18 @@ export type InputProps = {
   defaultValue?: string;
   onChange?: (value: string) => void;
   onBlur?: (event: FocusEvent<HTMLInputElement>) => void;
+  onFocus?: (event: FocusEvent<HTMLInputElement>) => void;
+  onClick?: (event: MouseEvent<HTMLInputElement>) => void;
   type?: "text" | "password" | "search";
   placeholder?: string;
   clearable?: boolean;
   maxLength?: number;
   disabled?: boolean;
+  readOnly?: boolean;
   id?: string;
   className?: string;
+  "aria-haspopup"?: "dialog" | "listbox" | "menu" | "grid" | "tree";
+  "aria-expanded"?: boolean;
 };
 
 const inputCls =
@@ -27,13 +33,18 @@ export function Input({
   defaultValue = "",
   onChange,
   onBlur,
+  onFocus,
+  onClick,
   type = "text",
   placeholder,
   clearable = false,
   maxLength,
   disabled = false,
+  readOnly = false,
   id,
   className = "",
+  "aria-haspopup": ariaHasPopup,
+  "aria-expanded": ariaExpanded,
 }: InputProps) {
   const [uncontrolled, setUncontrolled] = useState(defaultValue);
   const value = valueProp ?? uncontrolled;
@@ -44,6 +55,7 @@ export function Input({
   }
 
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
+    if (readOnly) return;
     commit(e.target.value);
   }
 
@@ -78,9 +90,14 @@ export function Input({
         placeholder={placeholder}
         maxLength={maxLength}
         disabled={disabled}
+        readOnly={readOnly}
+        aria-haspopup={ariaHasPopup}
+        aria-expanded={ariaExpanded}
         className={`${inputCls}${showClear ? " pr-7" : ""}`}
         onChange={handleChange}
         onBlur={onBlur}
+        onFocus={onFocus}
+        onClick={onClick}
       />
       {clearButton}
     </div>

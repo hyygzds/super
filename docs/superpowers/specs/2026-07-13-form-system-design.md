@@ -25,7 +25,7 @@
 
 - 完整 schema 表单引擎 / JSON Schema 驱动渲染。
 - 嵌套字段路径（如 `user.address.city`、`users[0].name`）——本期 `name` 为 **扁平 string**。
-- `DatePicker` / `TimePicker` / `CheckboxGroup`（可后续单独立项）。
+- `TimePicker` / `CheckboxGroup`（可后续单独立项）。`DatePicker` 已单独立项，见 [`2026-09-12-datepicker-design.md`](./2026-09-12-datepicker-design.md)。
 - Input 前后缀复杂插槽体系、Autosize Textarea、Radio 胶囊按钮变体。
 - Switch 的非 boolean `checkedValue` / `uncheckedValue`。
 - 像素级复刻 Farris 外观；本体系以目标库习惯为主，行为可参考 Farris 同类控件，但不绑定其嵌套 config API。

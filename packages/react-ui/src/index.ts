@@ -57,6 +57,8 @@ export { Tooltip } from "./components/Tooltip";
 export type { TooltipProps } from "./components/Tooltip";
 export { Input } from "./components/Input";
 export type { InputProps } from "./components/Input";
+export { DatePicker } from "./components/DatePicker";
+export type { DatePickerProps } from "./components/DatePicker";
 export { InputNumber } from "./components/InputNumber";
 export type { InputNumberProps } from "./components/InputNumber";
 export { Textarea } from "./components/Textarea";
