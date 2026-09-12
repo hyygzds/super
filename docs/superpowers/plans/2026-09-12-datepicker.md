@@ -51,7 +51,9 @@
 
 **Produces:** `parseIsoDate`, `formatIsoDate`, `addMonths`, `isDateInRange`, `buildMonthGrid`, types `CalendarCell`, `CalendarGrid`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
+
+RED: `Cannot find module './date'`
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -107,17 +109,17 @@ describe("date helpers", () => {
 });
 ```
 
-- [ ] **Step 2: 跑测试确认 RED**
+- [x] **Step 2: 跑测试确认 RED**
 
 Run: `npm run test -w @component-ai/form-core -- src/date.test.ts`  
-Expected: FAIL（模块不存在）
+Expected: FAIL（模块不存在）— 已确认
 
-- [ ] **Step 3: 实现 date.ts 并导出**
+- [x] **Step 3: 实现 date.ts 并导出**
 
-- [ ] **Step 4: 跑测试确认 GREEN**
+- [x] **Step 4: 跑测试确认 GREEN**
 
 Run: `npm run test -w @component-ai/form-core -- src/date.test.ts`  
-Expected: PASS
+GREEN: 3 passed
 
 ---
 
@@ -131,10 +133,10 @@ Expected: PASS
 - Create: `packages/react-ui/src/components/DatePicker.stories.tsx`
 - Modify: `packages/react-ui/src/index.ts`
 
-- [ ] **Step 1: Input readOnly 失败测试 + DatePicker 失败测试**
-- [ ] **Step 2: RED**
-- [ ] **Step 3: 实现 Input.readOnly 与 DatePicker**
-- [ ] **Step 4: GREEN** `npm run test -w @component-ai/react-ui -- src/components/Input.test.tsx src/components/DatePicker.test.tsx`
+- [x] **Step 1: Input readOnly 失败测试 + DatePicker 失败测试**
+- [x] **Step 2: RED**（DatePicker 模块不存在；Input 无 readonly）
+- [x] **Step 3: 实现 Input.readOnly 与 DatePicker**
+- [x] **Step 4: GREEN** `npm run test -w @component-ai/react-ui -- src/components/DatePicker.test.tsx src/components/Input.test.tsx` — 13 passed
 
 DatePicker 必须：`Input` `readOnly` + `clearable`；月导航与「今天」用 `Button`；面板 `role="dialog"` `aria-label="日期选择"`；日按钮 `aria-label` 为 ISO。
 
@@ -144,14 +146,14 @@ DatePicker 必须：`Input` `readOnly` + `clearable`；月导航与「今天」�
 
 **Files:** 镜像 Task 2 的 vue-ui 路径。
 
-- [ ] **Step 1–4:** 与 React 行为镜像（`modelValue` / `update:modelValue` / `blur`）
+- [x] **Step 1–4:** 与 React 行为镜像（`modelValue` / `update:modelValue` / `blur`）— Vue DatePicker + Input 13 passed
 
 ---
 
 ### Task 4: 文档与构建
 
-- [ ] 更新 `AGENTS.md` 组件表与 Form roadmap
-- [ ] `npm run build -w @component-ai/form-core`、`build:react`、`build:vue`
+- [x] 更新 `AGENTS.md` 组件表与 Form roadmap
+- [x] `npm run build -w @component-ai/form-core`、`build:react`、`build:vue`（exit 0）
 
 ## Self-review
 

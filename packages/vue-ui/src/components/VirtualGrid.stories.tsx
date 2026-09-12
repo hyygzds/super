@@ -247,7 +247,7 @@ export const CellTemplate: Story = {
   ),
 };
 
-export const OverflowTooltip: Story = {
+export const OverflowTooltipLongHeader: Story = {
   render: () => (
     <VirtualGrid
       columns={[

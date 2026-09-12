@@ -215,7 +215,7 @@ export const CellTemplate: Story = {
   },
 };
 
-export const OverflowTooltip: Story = {
+export const OverflowTooltipLongHeader: Story = {
   args: {
     columns: [
       { field: "id", title: "标识", width: 64 },
